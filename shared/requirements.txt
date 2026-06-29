@@ -1,0 +1,20 @@
+# Building with Claude — shared dependencies
+# Pinned to the stable lines current as of June 2026. Adjust as needed for your environment.
+
+# Core: official Anthropic SDK (Claude API + Python SDK)
+anthropic>=0.69,<1.0
+
+# Load API keys/config from a .env file (keeps secrets out of source)
+python-dotenv>=1.0
+
+# Schema-driven structured output validation (Modules 3, 5, 8)
+pydantic>=2.7
+
+# Embeddings for RAG (Module 6) via OpenAI. The Claude API has no embeddings endpoint.
+openai>=1.30
+
+# Lightweight local vector math for the RAG lab (no external vector DB required).
+numpy>=1.26
+
+# Token-aware testing / evaluation helpers (Module 7)
+# (kept minimal on purpose — evaluation logic is taught explicitly, not hidden in a framework)

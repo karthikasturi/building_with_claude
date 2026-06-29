@@ -105,7 +105,7 @@ This material is written against the **stable Claude API as of June 2026** and t
 | Structured output | `client.messages.parse(..., output_format=PydanticModel)` | Validated automatically. Raw form: `output_config={"format": {"type": "json_schema", ...}}`. The bare top-level `output_format=<dict>` on `create()` is deprecated. |
 | Streaming | `client.messages.stream(...)` + `.get_final_message()` | Default for long input/output or high `max_tokens`. |
 | Tool use | `@beta_tool` + `client.beta.messages.tool_runner(...)`, or a manual agentic loop | |
-| Embeddings (RAG) | Voyage AI (`voyageai`) | The Claude API has **no** embeddings endpoint; Anthropic recommends Voyage AI. |
+| Embeddings (RAG) | OpenAI (`openai`) | The Claude API has **no** embeddings endpoint; we use OpenAI's `text-embedding-3-small` model. |
 
 > **Always verify against the live docs before teaching.** The single source of truth is
 > [platform.claude.com/docs](https://platform.claude.com/docs). When in doubt, call
@@ -118,10 +118,3 @@ This material is written against the **stable Claude API as of June 2026** and t
 3. Treat model output as **untrusted input** — validate before it touches downstream systems.
 4. Never paste secrets, PII, or regulated data into prompts you don't control the retention of.
 5. Handle errors with typed exceptions and backoff; fail closed, log the `request_id`.
-
----
-
-## License / IP
-
-Course design © NIIT (NIIT Ltd) — StackRoute / RPS. See `course_outline/` for the source design
-document. This training content is for delivery of the *Building with Claude* program.
