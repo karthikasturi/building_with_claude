@@ -111,6 +111,27 @@ python day5/starter.py
 
 ---
 
+## Keeping the repo up to date
+
+If the instructor pushes updates during the course, pull them down before starting each day's labs:
+
+```bash
+# 1. Activate your virtual environment first (if not already active)
+source .venv/bin/activate          # macOS / Linux
+.venv\Scripts\activate.bat         # Windows CMD
+.venv\Scripts\Activate.ps1         # Windows PowerShell
+
+# 2. Pull the latest changes
+git pull
+
+# 3. Re-install dependencies in case new packages were added
+pip install -r shared/requirements.txt
+```
+
+> Your `.env` file is never overwritten by a pull — API keys you have set are safe.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Fix |
