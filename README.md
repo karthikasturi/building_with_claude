@@ -64,31 +64,9 @@ module_N_<name>/
 
 ---
 
-## Getting started (once, for the whole course)
+## Getting started
 
-All labs share one Python environment and one set of sample data under [`shared/`](shared/).
-
-```bash
-# 1. From the repo root, create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
-
-# 2. Install dependencies
-pip install -r shared/requirements.txt
-
-# 3. Configure your API key (NEVER hardcode it — see Module 1)
-cp shared/.env.example .env
-#   then edit .env and set ANTHROPIC_API_KEY=sk-ant-...
-
-# 4. Smoke-test your setup
-python shared/claude_client.py
-```
-
-`shared/claude_client.py` is a small, reusable, **secure** client factory used by every module's
-sample code. Run it directly for a one-line connectivity check.
-
-Full setup details, troubleshooting, and the security rationale are in
-[`shared/README.md`](shared/README.md) and Module 1.
+See **[SETUP.md](SETUP.md)** for the complete setup walkthrough: cloning the repo, creating a virtual environment (macOS / Linux / Windows), installing dependencies, configuring API keys, and running each day's labs in order.
 
 ---
 

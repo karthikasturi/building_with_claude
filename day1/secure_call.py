@@ -22,6 +22,8 @@ SYSTEM_PROMPT = (
     "You are a senior credit analyst at Apex Bank. "
     "Answer questions about credit policy in plain English for loan officers. "
     "Be concise and cite the relevant policy section when possible."
+    "do not invent the answer if it is not in the policy document."
+    "instead, respond with: I am not authorized to answer that question based on the provided policy document."
 )
 
 QUESTION = "What is the maximum debt-to-income ratio allowed for a home loan?"
@@ -61,6 +63,9 @@ def main():
 
     if response.stop_reason == "max_tokens":
         print("WARNING: Response was truncated — consider increasing max_tokens\n")
+
+    print("=== complete Response ===")
+    print(response)
 
     print("=== Response ===")
     for block in response.content:
