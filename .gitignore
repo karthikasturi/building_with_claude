@@ -21,8 +21,9 @@ day5/eval_logs/
 # LibreOffice lock files
 .~lock.*#
 
-# Slide source markdown (working files — generated PPTX is tracked instead)
-slides/slide_content/
+# Slides and visualisations — not distributed to learners
+slides/
+viz/
 
 # Course outline folder — ignore everything except the design document
 course_outline/*
