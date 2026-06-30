@@ -16,6 +16,7 @@ claude_outputs/
 *.local.json
 .cache/
 day3/vector_index.json
+day5/eval_logs/
 
 # LibreOffice lock files
 .~lock.*#
