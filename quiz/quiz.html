@@ -747,24 +747,31 @@ function updateHeader() {
 
 // ── Render ───────────────────────────────────────────────────────────────────
 
-function escHtml(s) {
+function esc(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
 function renderCode(raw) {
   if (!raw) return "";
-  // replace <hl>…</hl> markers with styled spans
-  let safe = escHtml(raw)
-    .replace(/&lt;hl&gt;/g, '<span class="hl">')
-    .replace(/&lt;\/hl&gt;/g, '</span>');
-  // basic syntax colouring
-  safe = safe
-    .replace(/(#[^\n]*)/g, '<span class="cm">$1</span>')
-    .replace(/\b(def|class|return|if|else|for|while|True|False|None|import|from|in|not|and|or|raise|try|except|with|as)\b/g,
-             '<span class="kw">$1</span>')
-    .replace(/"([^"\\]|\\.)*"/g, s => '<span class="st">' + s + '</span>')
-    .replace(/'([^'\\]|\\.)*'/g, s => '<span class="st">' + s + '</span>');
-  return '<div class="q-code">' + safe + '</div>';
+  // Process line by line so no regex ever runs over already-inserted HTML spans.
+  const lines = raw.split('\n').map(line => {
+    if (line.includes('<hl>')) {
+      // Escape first, then swap escaped <hl> markers for highlight spans.
+      // No further regex passes over this line — no cross-contamination risk.
+      return esc(line)
+        .replace(/&lt;hl&gt;/g,  '<span class="hl">')
+        .replace(/&lt;\/hl&gt;/g, '</span>');
+    }
+    // For plain lines: escape HTML, then color inline comments by position
+    // (splitting on whitespace+# avoids running regex over HTML we insert).
+    const hashPos = line.search(/\s+#/);
+    if (hashPos !== -1) {
+      return esc(line.slice(0, hashPos))
+           + '<span class="cm">' + esc(line.slice(hashPos)) + '</span>';
+    }
+    return esc(line);
+  });
+  return '<div class="q-code">' + lines.join('\n') + '</div>';
 }
 
 function renderQuestion(section, idx, q) {
