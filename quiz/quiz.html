@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knowledge Quiz | Building with Claude</title>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --teal:        #00695c;
+      --teal-mid:    #00796b;
+      --teal-lite:   #26a69a;
+      --teal-glow:   rgba(0, 105, 92, 0.20);
+      --bg:          #0e0e10;
+      --surface:     #18181c;
+      --surface2:    #202026;
+      --border:      #2a2a32;
+      --text:        #e8e8ee;
+      --text-dim:    #8a8a9a;
+      --text-muted:  #55555f;
+      --code-bg:     #141418;
+      --green:       #4caf50;
+      --green-bg:    rgba(76, 175, 80, 0.12);
+      --red:         #ef5350;
+      --red-bg:      rgba(239, 83, 80, 0.12);
+
+      /* module badge colours */
+      --m1: #1565c0; --m2: #6a1b9a; --m3: #2e7d32;
+      --m4: #c84b00; --m5: #b71c1c; --m6: #00695c; --m7: #4a148c;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    /* ── Sticky header ──────────────────────────────────────────────────────── */
+    #hdr {
+      position: sticky; top: 0; z-index: 100;
+      background: #11111566;
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+    .hdr-inner {
+      max-width: 900px; margin: 0 auto;
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .hdr-title h1 { font-size: 1.05rem; color: var(--teal-lite); font-weight: 700; }
+    .hdr-title p  { font-size: .78rem; color: var(--text-dim); margin-top: 1px; }
+
+    .score-wrap { text-align: right; }
+    .score-nums { font-size: 1.5rem; font-weight: 800; color: var(--text); line-height: 1; }
+    .score-nums span { color: var(--text-dim); font-size: 1rem; font-weight: 400; }
+    .score-label { font-size: .72rem; color: var(--text-dim); margin-top: 2px; }
+
+    .prog-bar {
+      width: 180px; height: 5px;
+      background: var(--border); border-radius: 99px;
+      overflow: hidden; margin-top: 6px;
+    }
+    .prog-fill {
+      height: 100%; width: 0%;
+      background: var(--teal-lite);
+      border-radius: 99px;
+      transition: width .4s ease;
+    }
+
+    /* ── Tabs ───────────────────────────────────────────────────────────────── */
+    .tab-row {
+      max-width: 900px; margin: 0 auto;
+      padding: 0 24px;
+      display: flex; gap: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 10px 18px;
+      font-size: .85rem; font-weight: 600;
+      background: none; border: none; cursor: pointer;
+      color: var(--text-dim);
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.on { color: var(--teal-lite); border-bottom-color: var(--teal-lite); }
+    .tab-badge {
+      display: inline-block;
+      background: var(--surface2); border-radius: 99px;
+      font-size: .7rem; padding: 1px 7px; margin-left: 6px;
+      color: var(--text-dim);
+    }
+
+    /* ── Main content ───────────────────────────────────────────────────────── */
+    main { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+
+    .quiz-sec { display: none; }
+    .quiz-sec.visible { display: block; }
+
+    .section-intro {
+      margin-bottom: 28px;
+      padding: 16px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--teal-mid);
+      border-radius: 8px;
+      font-size: .875rem; color: var(--text-dim);
+    }
+    .section-intro strong { color: var(--text); }
+
+    /* ── Question card ──────────────────────────────────────────────────────── */
+    .q-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 18px;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .q-card.answered-correct { border-color: var(--green); }
+    .q-card.answered-wrong   { border-color: var(--red); }
+
+    .q-header {
+      padding: 14px 18px 0;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .q-num {
+      font-size: .7rem; font-weight: 700; color: var(--text-muted);
+      letter-spacing: .06em; text-transform: uppercase;
+    }
+    .mod-badge {
+      font-size: .7rem; font-weight: 700;
+      padding: 2px 9px; border-radius: 99px;
+      color: #fff; letter-spacing: .03em;
+    }
+
+    .q-text {
+      padding: 10px 18px 0;
+      font-size: .925rem; color: var(--text); line-height: 1.6;
+    }
+    .q-text code {
+      background: var(--code-bg); border-radius: 4px;
+      padding: 1px 5px; font-family: "Fira Code", "Cascadia Code", monospace;
+      font-size: .85em; color: #80cbc4;
+    }
+
+    .q-code {
+      margin: 12px 18px 0;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: "Fira Code", "Cascadia Code", "Courier New", monospace;
+      font-size: .8rem; line-height: 1.6;
+      color: #cdd3de;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .q-code .hl { color: #ef9a9a; font-weight: 700; }  /* highlighted gap */
+    .q-code .kw { color: #ce93d8; }   /* keyword */
+    .q-code .fn { color: #80cbc4; }   /* function */
+    .q-code .st { color: #a5d6a7; }   /* string */
+    .q-code .cm { color: #546e7a; font-style: italic; } /* comment */
+
+    /* ── Options ────────────────────────────────────────────────────────────── */
+    .opts { padding: 14px 18px 4px; display: flex; flex-direction: column; gap: 8px; }
+
+    .opt {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .opt:hover:not(.locked) { border-color: var(--teal-mid); background: #1a2a28; }
+
+    .opt-radio {
+      width: 16px; height: 16px; flex-shrink: 0;
+      border: 2px solid var(--text-dim); border-radius: 50%;
+      margin-top: 2px;
+      transition: border-color .15s, background .15s;
+    }
+    .opt-label {
+      font-size: .875rem; color: var(--text-dim); line-height: 1.55;
+    }
+    .opt-label code {
+      background: var(--code-bg); border-radius: 4px;
+      padding: 1px 5px; font-family: "Fira Code", "Cascadia Code", monospace;
+      font-size: .82em; color: #80cbc4;
+    }
+
+    .opt.selected   .opt-radio { border-color: var(--teal-lite); background: var(--teal-lite); }
+    .opt.selected   .opt-label { color: var(--text); }
+
+    .opt.correct    { border-color: var(--green); background: var(--green-bg); }
+    .opt.correct    .opt-radio { border-color: var(--green); background: var(--green); }
+    .opt.correct    .opt-label { color: #a5d6a7; }
+
+    .opt.wrong      { border-color: var(--red); background: var(--red-bg); }
+    .opt.wrong      .opt-radio { border-color: var(--red); background: var(--red); }
+    .opt.wrong      .opt-label { color: #ef9a9a; }
+
+    .opt.locked { cursor: default; }
+    .opt.locked:hover { border-color: var(--border); background: var(--surface2); }
+    .opt.correct.locked:hover { border-color: var(--green); background: var(--green-bg); }
+    .opt.wrong.locked:hover   { border-color: var(--red);   background: var(--red-bg); }
+
+    /* ── Feedback ───────────────────────────────────────────────────────────── */
+    .feedback {
+      display: none;
+      margin: 10px 18px 16px;
+      padding: 12px 14px;
+      border-radius: 7px;
+      font-size: .85rem; line-height: 1.55;
+    }
+    .feedback.show { display: block; }
+    .feedback.ok  { background: var(--green-bg); border: 1px solid #388e3c; color: #a5d6a7; }
+    .feedback.err { background: var(--red-bg);   border: 1px solid #c62828; color: #ef9a9a; }
+    .feedback strong { color: #fff; }
+    .feedback code {
+      background: rgba(0,0,0,.3); border-radius: 4px;
+      padding: 1px 5px; font-family: "Fira Code", "Cascadia Code", monospace;
+      font-size: .82em;
+    }
+
+    /* ── Score summary ──────────────────────────────────────────────────────── */
+    .summary {
+      display: none;
+      margin-top: 36px;
+      padding: 28px 32px;
+      background: var(--surface);
+      border: 1px solid var(--teal-mid);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .summary.show { display: block; }
+    .summary h2 { font-size: 1.4rem; color: var(--teal-lite); margin-bottom: 8px; }
+    .summary .big { font-size: 3rem; font-weight: 800; color: var(--text); line-height: 1; }
+    .summary .pct { font-size: 1rem; color: var(--text-dim); margin-top: 4px; }
+    .summary .grade {
+      display: inline-block; margin-top: 16px;
+      padding: 6px 20px; border-radius: 99px;
+      font-size: .9rem; font-weight: 700;
+    }
+    .grade-a { background: var(--green-bg); color: #4caf50; border: 1px solid #388e3c; }
+    .grade-b { background: rgba(255,167,38,.1); color: #ffa726; border: 1px solid #f57c00; }
+    .grade-c { background: var(--red-bg); color: #ef5350; border: 1px solid #c62828; }
+    .summary p.note { font-size: .82rem; color: var(--text-dim); margin-top: 14px; }
+
+    /* ── Misc ───────────────────────────────────────────────────────────────── */
+    .divider { font-size: .75rem; font-weight: 700; color: var(--text-muted);
+               letter-spacing: .1em; text-transform: uppercase;
+               margin: 28px 0 14px; padding-bottom: 6px;
+               border-bottom: 1px solid var(--border); }
+
+    @media (max-width: 600px) {
+      .hdr-inner { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .prog-bar { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<div id="hdr">
+  <div class="hdr-inner">
+    <div class="hdr-title">
+      <h1>Building with Claude</h1>
+      <p>Knowledge Check &nbsp;·&nbsp; Modules 1 – 7</p>
+    </div>
+    <div class="score-wrap">
+      <div class="score-nums"><span id="sc-val">0</span> <span>/ <span id="sc-tot">27</span></span></div>
+      <div class="score-label">questions correct</div>
+      <div class="prog-bar"><div class="prog-fill" id="prog"></div></div>
+    </div>
+  </div>
+  <div class="tab-row">
+    <button class="tab on"  id="tab-mcq" onclick="showTab('mcq')">Concept MCQs<span class="tab-badge" id="b-mcq">0/17</span></button>
+    <button class="tab"     id="tab-sc"  onclick="showTab('sc')">Scenario Challenges<span class="tab-badge" id="b-sc">0/10</span></button>
+  </div>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<main>
+  <div id="sec-mcq" class="quiz-sec visible">
+    <div class="section-intro">
+      <strong>Concept MCQs</strong> — 15 questions covering all seven modules.
+      Click an option to see immediate feedback. There is no time limit.
+    </div>
+    <div id="mcq-mount"></div>
+    <div class="summary" id="sum-mcq"></div>
+  </div>
+
+  <div id="sec-sc" class="quiz-sec">
+    <div class="section-intro">
+      <strong>Scenario Challenges</strong> — 10 questions drawn from the five practice
+      scenarios in <code>day5/pattern_practice.md</code>. Each question tests a specific
+      decision point from a real implementation scenario.
+    </div>
+    <div id="sc-mount"></div>
+    <div class="summary" id="sum-sc"></div>
+  </div>
+</main>
+
+<script>
+// ── Question data ────────────────────────────────────────────────────────────
+
+const MODS = {
+  m1: { label: "Module 1 — API Setup",          color: "#1565c0" },
+  m2: { label: "Module 2 — Prompt Engineering", color: "#6a1b9a" },
+  m3: { label: "Module 3 — Structured Output",  color: "#2e7d32" },
+  m4: { label: "Module 4 — Conversation",       color: "#c84b00" },
+  m5: { label: "Module 5 — Tool Use",           color: "#b71c1c" },
+  m6: { label: "Module 6 — RAG",                color: "#00695c" },
+  m7: { label: "Module 7 — Evaluation",         color: "#4a148c" },
+  s1: { label: "Scenario — FreshStay Hotels",   color: "#1565c0" },
+  s2: { label: "Scenario — QuickCart",          color: "#6a1b9a" },
+  s3: { label: "Scenario — FreshMart",          color: "#2e7d32" },
+  s4: { label: "Scenario — InfoCorp HR",        color: "#00695c" },
+  s5: { label: "Scenario — Code Critique",      color: "#b71c1c" },
+};
+
+// code: plain text, use \n for newlines, <hl> … </hl> for highlight spans
+// opts / explain: may contain <code>…</code>
+
+const MCQ = [
+  // ── Module 1 ──────────────────────────────────────────────────────────────
+  {
+    mod: "m1",
+    q: "Which of the following correctly initialises the Anthropic client?",
+    code: null,
+    opts: [
+      '<code>anthropic.Anthropic(api_key="sk-ant-...")</code>',
+      '<code>anthropic.Anthropic()</code>',
+      '<code>anthropic.Client()</code>',
+      '<code>anthropic.SDK(api_key=os.environ["ANTHROPIC_API_KEY"])</code>',
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> <code>anthropic.Anthropic()</code> with no arguments reads <code>ANTHROPIC_API_KEY</code> from the environment automatically. Hardcoding the key exposes it in stack traces, logs, and version history.',
+  },
+  {
+    mod: "m1",
+    q: "A developer accidentally commits their <code>.env</code> file to a public GitHub repository. What is the most important first step?",
+    code: null,
+    opts: [
+      'Run <code>git reset --hard</code> and force-push to erase the commit from history',
+      'Make the repository private immediately to limit exposure',
+      'Revoke and rotate the API key at the provider\'s dashboard immediately',
+      'Add <code>.env</code> to <code>.gitignore</code> and push a new commit removing the file',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> Rotate the key first — always. GitHub is scraped by bots within seconds of a push, so the key is compromised the moment it becomes public. Erasing history and making the repo private are important follow-up steps, but they cannot un-expose a key that was already visible. Rotating immediately closes the window of abuse.',
+  },
+
+  // ── Module 2 ──────────────────────────────────────────────────────────────
+  {
+    mod: "m2",
+    q: "In the Claude instruction hierarchy, which layer has the highest authority?",
+    code: null,
+    opts: [
+      "User messages (the human turn)",
+      "The system prompt",
+      "Few-shot examples embedded in the prompt",
+      "Tool descriptions",
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> The system prompt sits at the top of the instruction hierarchy. User messages can request things, but the system prompt\'s constraints take precedence. Tool descriptions and few-shot examples provide context, not authority.',
+  },
+  {
+    mod: "m2",
+    q: "Which <code>stop_reason</code> indicates that Claude finished its response naturally?",
+    code: null,
+    opts: [
+      '<code>"tool_use"</code>',
+      '<code>"done"</code>',
+      '<code>"max_tokens"</code>',
+      '<code>"end_turn"</code>',
+    ],
+    ans: 3,
+    explain: '<strong>Correct.</strong> <code>"end_turn"</code> means Claude chose to stop. <code>"tool_use"</code> means it wants to call a tool (loop continues). <code>"max_tokens"</code> means the output was truncated — usually an error condition.',
+  },
+  {
+    mod: "m2",
+    q: "What does adding <code>cache_control: {\"type\": \"ephemeral\"}</code> to a system prompt block do?",
+    code: null,
+    opts: [
+      "Deletes the message from Anthropic servers after the API call",
+      "Marks that prefix as a prompt cache checkpoint, reducing cost on repeated calls",
+      "Limits the response to a single turn",
+      "Enables streaming for that specific block",
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> Prompt caching stores the KV cache up to that checkpoint. Subsequent calls that share the same prefix hit the cache and pay ~10% of the input token cost for the cached portion.',
+  },
+
+  // ── Module 3 ──────────────────────────────────────────────────────────────
+  {
+    mod: "m3",
+    q: "Which API method should you use to extract a validated Pydantic model from a Claude response?",
+    code: null,
+    opts: [
+      '<code>client.messages.create(output_format=MyModel)</code>',
+      '<code>client.messages.extract(schema=MyModel)</code>',
+      '<code>client.messages.parse(output_format=MyModel)</code>',
+      '<code>client.messages.create(response_model=MyModel)</code>',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> <code>messages.parse()</code> is the dedicated method. <code>output_format=</code> on <code>messages.create()</code> is deprecated. After a successful call, read the result from <code>response.parsed_output</code>.',
+  },
+  {
+    mod: "m3",
+    q: "In Pydantic v2, when combining <code>@field_validator</code> with a classmethod, what is the required decorator order?",
+    code: "class MyModel(BaseModel):\n    value: str\n\n    ___ # first decorator\n    ___ # second decorator\n    def validate_value(cls, v): ...",
+    opts: [
+      '<code>@field_validator</code> first, then <code>@classmethod</code>',
+      '<code>@staticmethod</code> first, then <code>@field_validator</code>',
+      '<code>@classmethod</code> first, then <code>@field_validator</code>',
+      'Order does not matter in Pydantic v2',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> <code>@classmethod</code> must appear directly above <code>@field_validator</code>. Reversing them raises a <code>PydanticUserError</code> at class definition time — the module fails to import entirely.',
+  },
+  {
+    mod: "m3",
+    q: "After a successful <code>messages.parse()</code> call, what does <code>response.parsed_output</code> contain?",
+    code: null,
+    opts: [
+      "A raw JSON string",
+      "A dictionary of field names to values",
+      "A validated instance of the Pydantic model you passed as <code>output_format</code>",
+      "A list of <code>ContentBlock</code> objects",
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> <code>parsed_output</code> returns a fully validated Pydantic model instance with proper Python types. You can access fields directly: <code>response.parsed_output.field_name</code>.',
+  },
+
+  // ── Module 4 ──────────────────────────────────────────────────────────────
+  {
+    mod: "m4",
+    q: "How should you append Claude's response to the conversation message list?",
+    code: 'messages.append({\n    "role": "assistant",\n    "content": ___\n})',
+    opts: [
+      '<code>response.content[0].text</code> — the text of the first content block',
+      '<code>response.text</code> — the convenience text accessor',
+      '<code>response.content</code> — the full content list',
+      '<code>str(response.content)</code> — serialised as a string',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> Always append <code>response.content</code> — the full list. Using <code>[0].text</code> silently drops <code>tool_use</code> and <code>thinking</code> blocks, causing the next API call to fail with a missing-block error.',
+  },
+  {
+    mod: "m4",
+    q: "When should you summarise and reset a <code>ConversationManager</code>'s message history?",
+    code: null,
+    opts: [
+      "After every 10 messages regardless of length",
+      "When the token count approaches the model's context limit",
+      "After every tool call in the agentic loop",
+      "Only when the user explicitly asks to start over",
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> Count tokens with <code>client.messages.count_tokens()</code> and summarise when approaching the limit. In the course labs the threshold is set at 40,000 tokens for safety headroom.',
+  },
+
+  // ── Module 5 ──────────────────────────────────────────────────────────────
+  {
+    mod: "m5",
+    q: "What is the correct break condition for the agentic tool-use loop?",
+    code: 'while True:\n    response = client.messages.create(...)\n    if response.stop_reason == ___:\n        break\n    # process tool calls ...',
+    opts: [
+      '<code>"tool_use"</code>',
+      '<code>"done"</code>',
+      '<code>"end_turn"</code>',
+      '<code>"complete"</code>',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> Break on <code>"end_turn"</code>. Breaking on <code>"tool_use"</code> exits the loop before the tools run — a silent failure where Claude appears to respond but never actually calls any tools.',
+  },
+  {
+    mod: "m5",
+    q: "What type must the <code>content</code> field of a <code>tool_result</code> block be?",
+    code: 'tool_results.append({\n    "type": "tool_result",\n    "tool_use_id": block.id,\n    "content": ___, # ← what type?\n})',
+    opts: [
+      "A Python dict",
+      "A Python list",
+      "A JSON string — <code>json.dumps(result)</code>",
+      "An integer or float for numeric results",
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> The <code>content</code> field must be a <strong>string</strong>. Passing a raw dict causes a <code>BadRequestError</code>. Always wrap with <code>json.dumps(result)</code>.',
+  },
+  {
+    mod: "m5",
+    q: "Which <code>tool_choice</code> value forces Claude to call one specific named tool?",
+    code: null,
+    opts: [
+      '<code>{"type": "auto"}</code>',
+      '<code>{"type": "any"}</code>',
+      '<code>{"type": "required", "name": "tool_name"}</code>',
+      '<code>{"type": "tool", "name": "tool_name"}</code>',
+    ],
+    ans: 3,
+    explain: '<strong>Correct.</strong> <code>{"type": "tool", "name": "..."}</code> forces a specific tool. <code>"auto"</code> lets Claude decide. <code>"any"</code> forces a tool call but lets Claude choose which one. There is no <code>"required"</code> type.',
+  },
+
+  // ── Module 6 ──────────────────────────────────────────────────────────────
+  {
+    mod: "m6",
+    q: "Why do RAG pipelines split documents into overlapping chunks rather than non-overlapping ones?",
+    code: null,
+    opts: [
+      "To reduce the total number of chunks and lower embedding costs",
+      "To ensure a sentence or idea split across a chunk boundary still appears fully in at least one chunk",
+      "To make cosine similarity scores higher across all chunks",
+      "To allow the same chunk to be retrieved multiple times in a single query",
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> Overlap (typically ~50 words) means that context straddling a boundary is fully present in an adjacent chunk. Without overlap, a key sentence cut in half at a chunk boundary may never be retrieved — the embedding of a truncated idea is weaker and misses the relevant query.',
+  },
+  {
+    mod: "m6",
+    q: "After computing cosine similarity scores, how do you retrieve the top-3 most relevant chunks?",
+    code: 'scored = [(cosine(q_emb, c.embedding), c) for c in store.chunks]\nresults = sorted(scored, key=lambda x: x[0], ___  )[:3]',
+    opts: [
+      'No keyword needed — sorted() defaults to highest score first',
+      '<code>reverse=False</code> — ascending puts highest at index 0',
+      '<code>reverse=True</code> — descending puts highest similarity first',
+      '<code>key=lambda x: -x[0]</code> — negate the score instead',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> <code>reverse=True</code> sorts descending so the highest similarity score is at index 0. Without it you get the <em>worst</em> matches first — a silent retrieval bug that looks correct but returns irrelevant chunks.',
+  },
+
+  // ── Module 7 ──────────────────────────────────────────────────────────────
+  {
+    mod: "m7",
+    q: "In the LLM-as-judge pattern, what does <strong>faithfulness</strong> measure?",
+    code: null,
+    opts: [
+      "Whether the answer is grammatically correct",
+      "Whether the model responded quickly enough",
+      "Whether every claim in the answer is supported by the retrieved context",
+      "Whether the answer is longer than the minimum required length",
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> Faithfulness = grounded in the provided context. An answer can be <em>relevant</em> (on-topic) but unfaithful (hallucinated). The judge separately scores faithfulness and relevance because they can diverge.',
+  },
+  {
+    mod: "m7",
+    q: "Why must you strip markdown fences before calling <code>json.loads()</code> on judge output?",
+    code: null,
+    opts: [
+      "Fences add invisible characters that exceed the token budget",
+      "Claude wraps JSON in ` ```json ``` ` blocks even when the system prompt says not to",
+      "The <code>json</code> module does not support multi-line strings",
+      "Fences are only valid in system prompts, not in responses",
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> Claude will almost always wrap JSON in markdown fences despite being told to return "JSON only." The fix is a regex: <code>re.search(r"```(?:json)?\\s*(\\{[\\s\\S]*?\\})\\s*```", text)</code>.',
+  },
+];
+
+// ── Scenario questions ──────────────────────────────────────────────────────
+
+const SCENARIO = [
+  // ── S1: FreshStay Hotels ─────────────────────────────────────────────────
+  {
+    mod: "s1",
+    q: "This FreshStay triage system prompt draft is missing one of the five required sections. Which section is absent?",
+    code: 'You are a guest experience triage assistant for FreshStay Hotels.\n\nCATEGORIES:\n- room_issue:      physical room problems\n- service_issue:   staff behaviour\n- billing_dispute: incorrect charges\n- compliment:      positive feedback\n- other:           anything else\n\nFALLBACK: If ambiguous, return {"category":"other","priority":"medium"}\n\nOUTPUT: {"category":"...","priority":"...","summary":"..."}',
+    opts: [
+      "Role definition — who Claude is and what it is responsible for",
+      "Priority levels with criteria — urgent / high / medium / low",
+      "Category definitions — they are already listed above",
+      "Output format — the JSON structure is already shown",
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> The five required sections are: Role → Categories → <strong>Priority levels with criteria</strong> → Fallback → Output. Without defined priority criteria, Claude has no basis for choosing between urgent, high, medium, and low.',
+  },
+  {
+    mod: "s1",
+    q: "A guest sends a vague email: <em>\"I had some issues during my stay last week.\"</em> Which fallback response is correct for the FreshStay system?",
+    code: null,
+    opts: [
+      '"I cannot classify this email. Please provide more detail."',
+      '{"category": "other", "priority": "medium", "note": "Requires human review — insufficient detail."}',
+      '{"category": "service_issue", "priority": "low"} — default to service and low priority',
+      'No response — skip ambiguous emails and wait for a follow-up',
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> The fallback must still return valid JSON in the same format. It sets <code>"category": "other"</code> and <code>"priority": "medium"</code> with a <code>note</code> explaining why human review is needed — so the downstream system can route it correctly.',
+  },
+
+  // ── S2: QuickCart ─────────────────────────────────────────────────────────
+  {
+    mod: "s2",
+    q: "The QuickCart <code>ReturnRequest</code> model has a decorator bug. Which line causes the error?",
+    code: 'class ReturnRequest(BaseModel):\n    order_id: str\n    return_reason: Literal["defective", "wrong_item"]\n\n    @field_validator("order_id")   # ← line A\n    @classmethod                   # ← line B\n    def validate_order_id(cls, v):\n        if not v.startswith("ORD-"):\n            raise ValueError("Must start with ORD-")\n        return v',
+    opts: [
+      "Line A — should use <code>@validator</code> instead of <code>@field_validator</code>",
+      "Line B — <code>@classmethod</code> must appear <em>above</em> <code>@field_validator</code>, not below",
+      "The method name — it must exactly match the field name <code>order_id</code>",
+      "The return value — it should return <code>None</code>, not the value",
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> In Pydantic v2, <code>@classmethod</code> must appear on the line immediately <em>before</em> <code>@field_validator</code>. Having them reversed raises a <code>PydanticUserError</code> at class definition time — the module cannot be imported at all.',
+  },
+  {
+    mod: "s2",
+    q: "On the first retry in <code>extract_return()</code>, what must be appended to <code>messages</code> before calling the API again?",
+    code: null,
+    opts: [
+      "Only the <code>ValidationError</code> details as a new user message",
+      "Only the previous assistant response (the bad JSON)",
+      "Both the bad assistant response AND the error message — in that order",
+      "A new system prompt with stricter output instructions",
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> The conversation history must show Claude <em>what it produced</em> (the bad response) <em>and why it failed</em> (the error). Appending only the error leaves the history broken — Claude has no assistant turn to follow the previous user turn.',
+  },
+
+  // ── S3: FreshMart ────────────────────────────────────────────────────────
+  {
+    mod: "s3",
+    q: "Gap 1 in the FreshMart inventory agent loop. What should replace the blank?",
+    code: 'while True:\n    response = client.messages.create(\n        model=MODEL, max_tokens=1024,\n        tools=tools, messages=messages\n    )\n    if response.stop_reason == <hl>___</hl>:\n        break\n    # ... process tool calls',
+    opts: [
+      '<code>"tool_use"</code>',
+      '<code>"done"</code>',
+      '<code>"end_turn"</code>',
+      '<code>"finished"</code>',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> Break on <code>"end_turn"</code>. If you break on <code>"tool_use"</code>, the loop exits at the exact moment Claude <em>wants</em> to call a tool — so the tools never execute and Claude never gets the results it needs.',
+  },
+  {
+    mod: "s3",
+    q: "Gap 2 in the FreshMart inventory agent loop. What should replace the blank?",
+    code: 'messages.append({\n    "role": "assistant",\n    "content": <hl>___</hl>\n})',
+    opts: [
+      '<code>response.content[0].text</code>',
+      '<code>response.text</code>',
+      '<code>json.dumps(response.content)</code>',
+      '<code>response.content</code>',
+    ],
+    ans: 3,
+    explain: '<strong>Correct.</strong> Append the full <code>response.content</code> list. Using <code>[0].text</code> silently drops the <code>tool_use</code> block from the history, causing the next API call to fail because the expected tool block is missing.',
+  },
+  {
+    mod: "s3",
+    q: "Gap 3 in the FreshMart inventory agent loop. What should replace the blank?",
+    code: 'tool_results.append({\n    "type": "tool_result",\n    "tool_use_id": block.id,\n    "content": <hl>___</hl>,\n})',
+    opts: [
+      '<code>result</code> — the raw dict returned by the tool',
+      '<code>str(result)</code> — convert the dict to a string',
+      '<code>json.dumps(result)</code> — serialise to a JSON string',
+      '<code>json.loads(result)</code> — parse the result string',
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> The API requires <code>content</code> to be a <strong>JSON string</strong>. Passing a raw Python dict causes a <code>BadRequestError</code>. <code>str(result)</code> produces an unquoted Python repr — also rejected. Use <code>json.dumps(result)</code>.',
+  },
+
+  // ── S4: InfoCorp HR ───────────────────────────────────────────────────────
+  {
+    mod: "s4",
+    q: "The InfoCorp HR assistant sometimes answers questions from its training knowledge instead of the policy documents. Which system prompt addition would fix this?",
+    code: null,
+    opts: [
+      'Add: "Keep answers under 100 words."',
+      'Add: "Every factual statement must cite its source: [Leave Policy, Section 3.1]" and an explicit fallback for out-of-scope questions',
+      'Add: "You are a helpful HR assistant."',
+      'Add: "Always respond in formal English."',
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> Two rules are required together: (1) a <strong>citation requirement</strong> that forces Claude to link claims to specific sections, and (2) an explicit <strong>"not in context" fallback</strong> that tells Claude what to do when the answer is absent — without the fallback, Claude fills gaps from training knowledge.',
+  },
+  {
+    mod: "s4",
+    q: "The faithfulness judge returns this text. Why does <code>json.loads(text)</code> raise a <code>JSONDecodeError</code>?",
+    code: '```json\n{"score": 4, "reasoning": "Answer is well grounded."}\n```',
+    opts: [
+      "The score value <code>4</code> is not a valid JSON type",
+      "The <code>reasoning</code> field is too long for the JSON parser",
+      "The response is wrapped in markdown fences — <code>json.loads()</code> cannot parse them",
+      "JSON requires single quotes, not double quotes",
+    ],
+    ans: 2,
+    explain: '<strong>Correct.</strong> Claude wraps JSON in <code>```json … ```</code> fences even when told "return JSON only." Strip fences first: <code>m = re.search(r"```(?:json)?\\s*(\\{[\\s\\S]*?\\})\\s*```", text)</code>, then <code>json.loads(m.group(1))</code>.',
+  },
+
+  // ── S5: Code Critique ────────────────────────────────────────────────────
+  {
+    mod: "s5",
+    q: "Program A has three bugs — one on each labelled line. Which combination correctly identifies all three?",
+    code: 'def get_recommendation(query: str) -> str:\n    messages = [{"role": "user", "content": query}]\n    while True:\n        response = client.messages.create(\n            model=MODEL, max_tokens=1024, tools=tools, messages=messages\n        )\n        if response.stop_reason == "tool_use":     # line A\n            break\n        messages.append({\n            "role": "assistant",\n            "content": response.content[0].text    # line B\n        })\n        for block in response.content:\n            if block.type == "tool_use":\n                result = run_tool(block.name, block.input)\n                messages.append({                  # line C\n                    "type": "tool_result",\n                    "tool_use_id": block.id,\n                    "content": json.dumps(result)\n                })',
+    opts: [
+      'A: correct break / B: should use full list / C: tool_result must be in a list',
+      'A: should be <code>"end_turn"</code> / B: should be <code>response.content</code> / C: <code>tool_result</code> must be inside a list in <code>content</code>',
+      'A: should be <code>"done"</code> / B: correct / C: content should be a dict not a string',
+      'A: correct / B: correct / C: missing <code>is_error</code> field',
+    ],
+    ans: 1,
+    explain: '<strong>Correct.</strong> All three bugs: <strong>A</strong> — <code>"tool_use"</code> exits before tools run; should be <code>"end_turn"</code>. <strong>B</strong> — <code>[0].text</code> drops tool_use blocks; should be <code>response.content</code>. <strong>C</strong> — the tool_result dict is appended directly to <code>messages</code>; it must be wrapped in a list: <code>{"role":"user","content":[tool_result]}</code>.',
+  },
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const state = {
+  answered: {},  // qKey → {correct: bool}
+  total: MCQ.length + SCENARIO.length,
+};
+
+function qKey(section, idx) { return section + "_" + idx; }
+
+function correctCount() {
+  return Object.values(state.answered).filter(v => v.correct).length;
+}
+
+function answeredCount() {
+  return Object.keys(state.answered).length;
+}
+
+function updateHeader() {
+  const c = correctCount();
+  const a = answeredCount();
+  document.getElementById("sc-val").textContent = c;
+  document.getElementById("sc-tot").textContent = state.total;
+  // update tab badges
+  const pct = a / state.total * 100;
+  document.getElementById("prog").style.width = pct + "%";
+
+  const mcqDone = MCQ.filter((_, i) => state.answered[qKey("mcq", i)]).length;
+  const scDone  = SCENARIO.filter((_, i) => state.answered[qKey("sc", i)]).length;
+  document.getElementById("b-mcq").textContent = mcqDone + "/" + MCQ.length;
+  document.getElementById("b-sc").textContent  = scDone  + "/" + SCENARIO.length;
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+
+function escHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function renderCode(raw) {
+  if (!raw) return "";
+  // replace <hl>…</hl> markers with styled spans
+  let safe = escHtml(raw)
+    .replace(/&lt;hl&gt;/g, '<span class="hl">')
+    .replace(/&lt;\/hl&gt;/g, '</span>');
+  // basic syntax colouring
+  safe = safe
+    .replace(/(#[^\n]*)/g, '<span class="cm">$1</span>')
+    .replace(/\b(def|class|return|if|else|for|while|True|False|None|import|from|in|not|and|or|raise|try|except|with|as)\b/g,
+             '<span class="kw">$1</span>')
+    .replace(/"([^"\\]|\\.)*"/g, s => '<span class="st">' + s + '</span>')
+    .replace(/'([^'\\]|\\.)*'/g, s => '<span class="st">' + s + '</span>');
+  return '<div class="q-code">' + safe + '</div>';
+}
+
+function renderQuestion(section, idx, q) {
+  const key = qKey(section, idx);
+  const mod = MODS[q.mod];
+  const qNum = (section === "mcq" ? idx + 1 : idx + 1);
+  const prefix = section === "mcq" ? "Q" : "S";
+
+  const optsHtml = q.opts.map((opt, oi) =>
+    `<div class="opt" id="${key}_opt${oi}" onclick="choose('${key}',${oi},${q.ans})">
+      <div class="opt-radio"></div>
+      <div class="opt-label">${opt}</div>
+    </div>`
+  ).join("");
+
+  return `
+  <div class="q-card" id="${key}_card">
+    <div class="q-header">
+      <span class="q-num">${prefix}${qNum}</span>
+      <span class="mod-badge" style="background:${mod.color}">${mod.label}</span>
+    </div>
+    <div class="q-text">${q.q}</div>
+    ${renderCode(q.code)}
+    <div class="opts">${optsHtml}</div>
+    <div class="feedback" id="${key}_fb"></div>
+  </div>`;
+}
+
+function renderSection(section, questions, mountId) {
+  const groups = {};
+  questions.forEach((q, i) => {
+    (groups[q.mod] = groups[q.mod] || []).push({ q, i });
+  });
+
+  let html = "";
+  if (section === "mcq") {
+    // Group by module with dividers
+    const seen = new Set();
+    questions.forEach((q, i) => {
+      if (!seen.has(q.mod)) {
+        seen.add(q.mod);
+        html += `<div class="divider">${MODS[q.mod].label}</div>`;
+      }
+      html += renderQuestion(section, i, q);
+    });
+  } else {
+    questions.forEach((q, i) => html += renderQuestion(section, i, q));
+  }
+
+  document.getElementById(mountId).innerHTML = html;
+}
+
+// ── Interaction ──────────────────────────────────────────────────────────────
+
+function choose(key, chosen, correct) {
+  if (state.answered[key]) return; // already answered
+
+  const isCorrect = chosen === correct;
+  state.answered[key] = { correct: isCorrect };
+
+  // Style all options
+  const q = key.startsWith("mcq") ? MCQ[+key.split("_")[1]] : SCENARIO[+key.split("_")[1]];
+  q.opts.forEach((_, oi) => {
+    const el = document.getElementById(key + "_opt" + oi);
+    el.classList.add("locked");
+    if (oi === correct) el.classList.add("correct");
+    else if (oi === chosen) el.classList.add("wrong");
+  });
+
+  // Card border
+  const card = document.getElementById(key + "_card");
+  card.classList.add(isCorrect ? "answered-correct" : "answered-wrong");
+
+  // Feedback
+  const fb = document.getElementById(key + "_fb");
+  fb.classList.add("show", isCorrect ? "ok" : "err");
+  if (isCorrect) {
+    fb.innerHTML = q.explain;
+  } else {
+    fb.innerHTML = `<strong>Not quite.</strong> The correct answer is option ${String.fromCharCode(65+correct)}.  ${q.explain}`;
+  }
+
+  updateHeader();
+  checkSectionComplete(key.split("_")[0]);
+}
+
+function checkSectionComplete(section) {
+  const qs = section === "mcq" ? MCQ : SCENARIO;
+  const allDone = qs.every((_, i) => state.answered[qKey(section, i)]);
+  if (!allDone) return;
+
+  const correct = qs.filter((_, i) => state.answered[qKey(section, i)].correct).length;
+  const total   = qs.length;
+  const pct     = Math.round(correct / total * 100);
+
+  let gradeClass = "grade-c", gradeText = "Keep practising";
+  if (pct >= 80) { gradeClass = "grade-a"; gradeText = "Ready"; }
+  else if (pct >= 60) { gradeClass = "grade-b"; gradeText = "Almost there"; }
+
+  const sumEl = document.getElementById("sum-" + section);
+  sumEl.innerHTML = `
+    <h2>Section Complete</h2>
+    <div class="big">${correct}/${total}</div>
+    <div class="pct">${pct}% correct</div>
+    <span class="grade ${gradeClass}">${gradeText}</span>
+    <p class="note">Review the red cards above — each one shows exactly what the right answer is and why.</p>
+  `;
+  sumEl.classList.add("show");
+  setTimeout(() => sumEl.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+}
+
+// ── Tab switching ────────────────────────────────────────────────────────────
+
+function showTab(t) {
+  document.getElementById("sec-mcq").classList.toggle("visible", t === "mcq");
+  document.getElementById("sec-sc").classList.toggle("visible",  t === "sc");
+  document.getElementById("tab-mcq").classList.toggle("on", t === "mcq");
+  document.getElementById("tab-sc").classList.toggle("on",  t === "sc");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+renderSection("mcq", MCQ,      "mcq-mount");
+renderSection("sc",  SCENARIO, "sc-mount");
+updateHeader();
+</script>
+</body>
+</html>
