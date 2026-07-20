@@ -1,0 +1,10 @@
+[project]
+name = "token-cost-explorer"
+version = "0.1.0"
+description = "Module 1 demo — count_tokens() pre-call estimate vs. response.usage post-call (based on day1/secure_call.py)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.117.0",
+    "python-dotenv>=1.2.2",
+]

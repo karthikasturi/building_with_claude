@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Secure Request Flow | Building with Claude</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --teal:#00695c; --teal-mid:#00796b; --teal-lite:#26a69a; --teal-glow:rgba(0,105,92,.20);
+    --bg:#0e0e10; --surface:#18181c; --surface2:#202026; --border:#2a2a32;
+    --text:#e8e8ee; --text-dim:#8a8a9a; --text-muted:#55555f; --code-bg:#141418;
+    --green:#4caf50; --green-bg:rgba(76,175,80,.12);
+    --red:#ef5350; --red-bg:rgba(239,83,80,.12);
+    --amber:#ffb300; --amber-bg:rgba(255,179,0,.14);
+    --m1:#1565c0;
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f3; --border:#dfe0e5;
+    --text:#1b1b1f; --text-dim:#5b5c66; --text-muted:#8a8b94; --code-bg:#eef0f2;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f3; --border:#dfe0e5;
+      --text:#1b1b1f; --text-dim:#5b5c66; --text-muted:#8a8b94; --code-bg:#eef0f2;
+    }
+  }
+
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+       background:var(--bg); color:var(--text); line-height:1.6; font-size:15px}
+
+  #hdr{position:sticky; top:0; z-index:100; background:color-mix(in srgb, var(--bg) 85%, transparent);
+       backdrop-filter:blur(14px); border-bottom:1px solid var(--border)}
+  .hdr-inner{max-width:980px; margin:0 auto; padding:14px 24px; display:flex; align-items:center;
+             justify-content:space-between; gap:16px; flex-wrap:wrap}
+  .hdr-title{display:flex; align-items:center; gap:10px}
+  .badge{background:var(--m1); color:#fff; font-size:.68rem; font-weight:700; padding:3px 9px;
+         border-radius:99px; letter-spacing:.03em}
+  .hdr-title h1{font-size:1.05rem; color:var(--teal-lite); font-weight:700}
+  .hdr-title p{font-size:.76rem; color:var(--text-dim); margin-top:1px}
+  #theme-toggle{background:var(--surface2); border:1px solid var(--border); color:var(--text);
+                border-radius:8px; padding:7px 12px; font-size:.78rem; cursor:pointer}
+  #theme-toggle:hover{border-color:var(--teal-lite)}
+
+  main{max-width:980px; margin:0 auto; padding:28px 24px 90px}
+  .intro{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--teal-mid);
+         border-radius:8px; padding:16px 20px; font-size:.88rem; color:var(--text-dim); margin-bottom:28px}
+  .intro strong{color:var(--text)}
+
+  section{margin-bottom:44px}
+  .sec-head{display:flex; align-items:baseline; gap:10px; margin-bottom:6px; flex-wrap:wrap}
+  .sec-head h2{font-size:1.15rem; color:var(--text)}
+  .sec-num{background:var(--teal); color:#fff; width:26px; height:26px; border-radius:50%;
+           display:inline-flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700; flex-shrink:0}
+  .sec-sub{font-size:.82rem; color:var(--text-dim); margin-bottom:18px}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px}
+
+  button.btn{background:var(--teal-mid); color:#fff; border:none; border-radius:8px; padding:9px 16px;
+             font-size:.85rem; font-weight:600; cursor:pointer; transition:background .15s}
+  button.btn:hover{background:var(--teal-lite)}
+  button.btn.secondary{background:var(--surface2); color:var(--text); border:1px solid var(--border)}
+  button.btn.secondary:hover{border-color:var(--teal-lite)}
+  button.btn:disabled{opacity:.4; cursor:not-allowed}
+  button.btn.danger{background:#b71c1c}
+  button.btn.danger:hover{background:#c62828}
+
+  pre.code{background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:14px 16px;
+           font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82rem; overflow-x:auto;
+           line-height:1.6; white-space:pre-wrap; word-break:break-word}
+
+  /* ── Section 1: step flow ───────────────────────────────────────────── */
+  .flow-track{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px}
+  .flow-node{
+    flex:1; min-width:110px; text-align:center; padding:10px 8px; border-radius:8px;
+    background:var(--surface2); border:1px solid var(--border); font-size:.72rem; color:var(--text-dim);
+    cursor:pointer; transition:all .2s; position:relative;
+  }
+  .flow-node .n{display:block; font-weight:700; font-size:.9rem; color:var(--text); margin-bottom:2px}
+  .flow-node.active{background:var(--teal-glow); border-color:var(--teal-lite); color:var(--teal-lite)}
+  .flow-node.active .n{color:var(--teal-lite)}
+  .flow-node.done{opacity:.55}
+  .flow-detail{background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:18px;
+               margin-top:8px}
+  .flow-detail h3{font-size:.95rem; margin-bottom:8px; color:var(--teal-lite)}
+  .flow-detail p{font-size:.83rem; color:var(--text-dim); margin-bottom:12px}
+  .flow-controls{display:flex; gap:10px; margin-top:16px; align-items:center}
+  .flow-progress{font-size:.76rem; color:var(--text-muted); margin-left:auto}
+
+  /* ── Section 2: key handling comparison ─────────────────────────────── */
+  .compare-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:700px){.compare-grid{grid-template-columns:1fr}}
+  .compare-card{border-radius:10px; padding:18px; border:1px solid var(--border); background:var(--code-bg)}
+  .compare-card.bad{border-color:rgba(239,83,80,.4)}
+  .compare-card.good{border-color:rgba(76,175,80,.4)}
+  .compare-title{font-size:.85rem; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px}
+  .compare-title.bad{color:var(--red)}
+  .compare-title.good{color:var(--green)}
+  .result-box{margin-top:14px; border-radius:8px; padding:12px 14px; font-size:.78rem; display:none}
+  .result-box.show{display:block; animation:fadein .3s ease}
+  @keyframes fadein{from{opacity:0; transform:translateY(-4px)} to{opacity:1; transform:translateY(0)}}
+  .result-box.leak{background:var(--red-bg); border:1px solid rgba(239,83,80,.4); color:var(--red)}
+  .result-box.safe{background:var(--green-bg); border:1px solid rgba(76,175,80,.4); color:var(--green)}
+  .leaked-key{background:rgba(239,83,80,.2); padding:1px 6px; border-radius:4px; font-family:ui-monospace,monospace}
+  .git-line-add{color:var(--green)}
+  .git-line-ignore{color:var(--text-muted); font-style:italic}
+
+  /* ── Section 3: anatomy inspector ───────────────────────────────────── */
+  .anatomy-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:800px){.anatomy-grid{grid-template-columns:1fr}}
+  .field{
+    cursor:pointer; border-bottom:1px dashed rgba(38,166,154,.55); transition:background .15s;
+    padding:0 1px; border-radius:3px;
+  }
+  .field:hover, .field.on{background:var(--teal-glow); color:var(--teal-lite)}
+  .anatomy-desc{
+    margin-top:14px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    padding:14px 16px; font-size:.82rem; color:var(--text-dim); min-height:52px;
+  }
+  .anatomy-desc b{color:var(--teal-lite)}
+
+  footer{max-width:980px; margin:0 auto; padding:0 24px 60px; font-size:.76rem; color:var(--text-muted)}
+  footer a{color:var(--teal-lite); text-decoration:none}
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <div class="hdr-inner">
+    <div class="hdr-title">
+      <span class="badge">MODULE 1</span>
+      <div>
+        <h1>Secure Request Flow</h1>
+        <p>Building with Claude — SDK setup, key handling &amp; request/response anatomy</p>
+      </div>
+    </div>
+    <button id="theme-toggle" onclick="toggleTheme()">🌙 / ☀️</button>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <strong>Why this matters:</strong> A working Claude call is really seven small, ordered steps —
+    load the key, verify it, build a client, send a request, get a response, and read it safely.
+    Miss a step (or hardcode the key) and you either crash, leak a secret, or trust bad output.
+    Everything below is fully offline and interactive — nothing sends a real request.
+  </div>
+
+  <!-- ══════════════ SECTION 1 — step-through flow ══════════════ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">1</span><h2>Step through a secure call</h2></div>
+    <p class="sec-sub">Click a node below, or use Next/Prev, to walk through exactly what happens
+      between running <code>python secure_call.py</code> and seeing Claude's answer on screen.</p>
+
+    <div class="card">
+      <div class="flow-track" id="flow-track"></div>
+      <div class="flow-detail">
+        <h3 id="flow-title"></h3>
+        <p id="flow-explain"></p>
+        <pre class="code" id="flow-code"></pre>
+      </div>
+      <div class="flow-controls">
+        <button class="btn secondary" id="flow-prev" onclick="flowStep(-1)">← Prev</button>
+        <button class="btn" id="flow-next" onclick="flowStep(1)">Next →</button>
+        <span class="flow-progress" id="flow-progress"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SECTION 2 — key handling comparison ══════════════ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">2</span><h2>Hardcoded key vs. environment variable</h2></div>
+    <p class="sec-sub">Both snippets "work." Click <strong>Simulate: push to GitHub</strong> on each
+      to see what actually happens to your secret the moment the code leaves your machine.</p>
+
+    <div class="compare-grid">
+      <div class="compare-card bad">
+        <div class="compare-title bad">❌ Hardcoded key</div>
+        <pre class="code">client = anthropic.Anthropic(
+    api_key="sk-ant-api03-7hJ2...pQ9x"
+)</pre>
+        <button class="btn danger" onclick="simulatePush('bad')">Simulate: push to GitHub</button>
+        <div class="result-box leak" id="result-bad">
+          🚨 <strong>Key exposed.</strong> The literal string is now permanently part of your git
+          history — even if you delete the line in a later commit, it's still recoverable from the
+          repo's past commits. Public repos are scanned by automated secret-scanners within
+          minutes. <strong>Treat this key as compromised — revoke it in the Console immediately.</strong>
+          <div style="margin-top:8px" class="git-line-add">+ api_key="<span class="leaked-key">sk-ant-api03-7hJ2...pQ9x</span>"</div>
+        </div>
+      </div>
+
+      <div class="compare-card good">
+        <div class="compare-title good">✅ Environment variable</div>
+        <pre class="code">load_dotenv()
+client = anthropic.Anthropic()
+# reads ANTHROPIC_API_KEY from os.environ</pre>
+        <button class="btn secondary" onclick="simulatePush('good')">Simulate: push to GitHub</button>
+        <div class="result-box safe" id="result-good">
+          ✅ <strong>Nothing sensitive pushed.</strong> <code>.env</code> matches a pattern in
+          <code>.gitignore</code>, so git refuses to track it. The key never enters source control.
+          <div style="margin-top:8px" class="git-line-ignore">$ git status<br>&nbsp;&nbsp;.env (ignored)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SECTION 3 — request/response anatomy ══════════════ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">3</span><h2>Anatomy of a request &amp; response</h2></div>
+    <p class="sec-sub">Click any highlighted field to see what it does.</p>
+
+    <div class="card">
+      <div class="anatomy-grid">
+        <div>
+          <p style="font-size:.78rem; color:var(--text-muted); margin-bottom:6px;">REQUEST — client.messages.create(...)</p>
+          <pre class="code">{
+  "<span class="field" data-k="model">model</span>": "claude-haiku-4-5",
+  "<span class="field" data-k="max_tokens">max_tokens</span>": 1024,
+  "<span class="field" data-k="system">system</span>": "You are a credit analyst...",
+  "<span class="field" data-k="messages">messages</span>": [
+    {"role": "user", "content": "What is the max DTI?"}
+  ]
+}</pre>
+        </div>
+        <div>
+          <p style="font-size:.78rem; color:var(--text-muted); margin-bottom:6px;">RESPONSE — the Message object</p>
+          <pre class="code">{
+  "<span class="field" data-k="id">id</span>": "msg_01XyZ...",
+  "<span class="field" data-k="content">content</span>": [
+    {"type": "text", "text": "Section 2.2 sets..."}
+  ],
+  "<span class="field" data-k="stop_reason">stop_reason</span>": "end_turn",
+  "<span class="field" data-k="usage">usage</span>": {
+    "<span class="field" data-k="input_tokens">input_tokens</span>": 42,
+    "<span class="field" data-k="output_tokens">output_tokens</span>": 31
+  }
+}</pre>
+        </div>
+      </div>
+      <div class="anatomy-desc" id="anatomy-desc">👆 Click a field above to see what it controls or means.</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Part of <a href="../../guides/module-01-api-setup-and-secure-integration.md">Module 1 — API Setup
+  and Secure Integration</a> · Building with Claude
+</footer>
+
+<script>
+  function toggleTheme(){
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    root.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+  }
+
+  // ── Section 1: step-through flow ─────────────────────────────────────
+  const STEPS = [
+    {
+      label: '.env',
+      title: '1 · Secrets live in .env, never in code',
+      explain: 'Your real key sits in a local .env file. shared/.env.example is the only version tracked by git — placeholder values only.',
+      code: 'ANTHROPIC_API_KEY=sk-ant-api03-...\nANTHROPIC_MODEL=claude-haiku-4-5'
+    },
+    {
+      label: 'load_dotenv()',
+      title: '2 · load_dotenv() reads .env into the process',
+      explain: 'This must run before any code tries to read os.environ, or the variables simply won\'t be there yet.',
+      code: 'from dotenv import load_dotenv\nload_dotenv()'
+    },
+    {
+      label: 'Check key',
+      title: '3 · Fail fast if the key is missing',
+      explain: 'Check presence explicitly and raise a descriptive error immediately — before any API call, not three lines into execution.',
+      code: 'if not os.environ.get("ANTHROPIC_API_KEY"):\n    raise EnvironmentError(\n        "ANTHROPIC_API_KEY is not set."\n    )'
+    },
+    {
+      label: 'Build client',
+      title: '4 · anthropic.Anthropic() — no key argument',
+      explain: 'The SDK reads ANTHROPIC_API_KEY from the environment automatically. The raw string never touches your code.',
+      code: 'client = anthropic.Anthropic()'
+    },
+    {
+      label: 'Send request',
+      title: '5 · client.messages.create(...) → HTTPS POST',
+      explain: 'The SDK serializes model, max_tokens, system, and messages into a request and sends it to api.anthropic.com over HTTPS with the key as a bearer credential.',
+      code: 'response = client.messages.create(\n    model=MODEL, max_tokens=1024,\n    system=SYSTEM_PROMPT, messages=messages,\n)'
+    },
+    {
+      label: 'Claude runs',
+      title: '6 · The model generates a response',
+      explain: 'Claude predicts tokens one at a time (see visualization 1) until it reaches a natural stop or your max_tokens ceiling.',
+      code: '# server-side — no code here,\n# just the token-by-token loop from viz #1'
+    },
+    {
+      label: 'Read safely',
+      title: '7 · Check stop_reason, then read content + usage',
+      explain: 'Never index content[0] blindly. Check why generation stopped, iterate content for text blocks, and log usage + request id.',
+      code: 'if response.stop_reason == "max_tokens":\n    print("WARNING: truncated")\n\ntext = next(b.text for b in response.content\n            if b.type == "text")'
+    },
+  ];
+
+  let flowIdx = 0;
+
+  function renderFlowTrack(){
+    const track = document.getElementById('flow-track');
+    track.innerHTML = '';
+    STEPS.forEach((s, i) => {
+      const node = document.createElement('div');
+      node.className = 'flow-node' + (i === flowIdx ? ' active' : i < flowIdx ? ' done' : '');
+      node.innerHTML = `<span class="n">${i+1}</span>${s.label}`;
+      node.onclick = () => { flowIdx = i; renderFlow(); };
+      track.appendChild(node);
+    });
+  }
+
+  function renderFlow(){
+    renderFlowTrack();
+    const s = STEPS[flowIdx];
+    document.getElementById('flow-title').textContent = s.title;
+    document.getElementById('flow-explain').textContent = s.explain;
+    document.getElementById('flow-code').textContent = s.code;
+    document.getElementById('flow-progress').textContent = `Step ${flowIdx+1} of ${STEPS.length}`;
+    document.getElementById('flow-prev').disabled = flowIdx === 0;
+    document.getElementById('flow-next').disabled = flowIdx === STEPS.length - 1;
+  }
+
+  function flowStep(delta){
+    flowIdx = Math.min(STEPS.length - 1, Math.max(0, flowIdx + delta));
+    renderFlow();
+  }
+
+  // ── Section 2: key handling comparison ───────────────────────────────
+  function simulatePush(kind){
+    document.getElementById('result-' + kind).classList.add('show');
+  }
+
+  // ── Section 3: anatomy inspector ─────────────────────────────────────
+  const FIELD_DESC = {
+    model: 'Which Claude model serves this request — e.g. claude-haiku-4-5 (fast/cheap), claude-sonnet-4-6 (balanced), claude-opus-4-8 (most capable).',
+    max_tokens: 'A hard ceiling on how many tokens the response may contain. Hitting it produces stop_reason: "max_tokens" and a truncated answer.',
+    system: 'The system prompt — role, rules, and output format. Kept separate from the conversation so it doesn\'t compete with user turns for attention.',
+    messages: 'The conversation so far, as a list of {role, content} turns — "user" and "assistant" alternating.',
+    id: 'Anthropic\'s unique ID for this response — useful for logs, but the id you actually hand to support is response._request_id.',
+    content: 'A list of content blocks in the reply. Iterate and check block.type == "text" — later modules add "tool_use" blocks here too.',
+    stop_reason: 'Why generation stopped: "end_turn" (natural finish), "max_tokens" (hit your ceiling), "stop_sequence", or "tool_use".',
+    usage: 'Actual token counts for this call — what you log for cost tracking, separate from the pre-call count_tokens() estimate.',
+    input_tokens: 'Tokens consumed by system + messages you sent in — billed on every call.',
+    output_tokens: 'Tokens Claude generated in the response — typically billed at a higher per-token rate than input.',
+  };
+
+  document.querySelectorAll('.field').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.field').forEach(f => f.classList.remove('on'));
+      el.classList.add('on');
+      const key = el.dataset.k;
+      document.getElementById('anatomy-desc').innerHTML = `<b>${key}</b> — ${FIELD_DESC[key] || ''}`;
+    });
+  });
+
+  renderFlow();
+</script>
+</body>
+</html>

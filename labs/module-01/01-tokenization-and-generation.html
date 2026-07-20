@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tokenization &amp; Next-Token Generation | Building with Claude</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --teal:#00695c; --teal-mid:#00796b; --teal-lite:#26a69a; --teal-glow:rgba(0,105,92,.20);
+    --bg:#0e0e10; --surface:#18181c; --surface2:#202026; --border:#2a2a32;
+    --text:#e8e8ee; --text-dim:#8a8a9a; --text-muted:#55555f; --code-bg:#141418;
+    --green:#4caf50; --green-bg:rgba(76,175,80,.12);
+    --red:#ef5350; --red-bg:rgba(239,83,80,.12);
+    --amber:#ffb300; --amber-bg:rgba(255,179,0,.14);
+    --m1:#1565c0;
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f3; --border:#dfe0e5;
+    --text:#1b1b1f; --text-dim:#5b5c66; --text-muted:#8a8b94; --code-bg:#eef0f2;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f3; --border:#dfe0e5;
+      --text:#1b1b1f; --text-dim:#5b5c66; --text-muted:#8a8b94; --code-bg:#eef0f2;
+    }
+  }
+
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.6; font-size:15px;
+  }
+
+  #hdr{position:sticky; top:0; z-index:100; background:color-mix(in srgb, var(--bg) 85%, transparent);
+       backdrop-filter:blur(14px); border-bottom:1px solid var(--border)}
+  .hdr-inner{max-width:980px; margin:0 auto; padding:14px 24px; display:flex; align-items:center;
+             justify-content:space-between; gap:16px; flex-wrap:wrap}
+  .hdr-title{display:flex; align-items:center; gap:10px}
+  .badge{background:var(--m1); color:#fff; font-size:.68rem; font-weight:700; padding:3px 9px;
+         border-radius:99px; letter-spacing:.03em}
+  .hdr-title h1{font-size:1.05rem; color:var(--teal-lite); font-weight:700}
+  .hdr-title p{font-size:.76rem; color:var(--text-dim); margin-top:1px}
+  #theme-toggle{background:var(--surface2); border:1px solid var(--border); color:var(--text);
+                border-radius:8px; padding:7px 12px; font-size:.78rem; cursor:pointer}
+  #theme-toggle:hover{border-color:var(--teal-lite)}
+
+  main{max-width:980px; margin:0 auto; padding:28px 24px 90px}
+
+  .intro{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--teal-mid);
+         border-radius:8px; padding:16px 20px; font-size:.88rem; color:var(--text-dim); margin-bottom:28px}
+  .intro strong{color:var(--text)}
+
+  section{margin-bottom:40px}
+  .sec-head{display:flex; align-items:baseline; gap:10px; margin-bottom:6px; flex-wrap:wrap}
+  .sec-head h2{font-size:1.15rem; color:var(--text)}
+  .sec-num{background:var(--teal); color:#fff; width:26px; height:26px; border-radius:50%;
+           display:inline-flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700}
+  .sec-sub{font-size:.82rem; color:var(--text-dim); margin-bottom:18px}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px}
+
+  textarea, input[type=text]{
+    width:100%; background:var(--code-bg); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9rem;
+    padding:12px 14px; resize:vertical;
+  }
+  textarea:focus, input[type=text]:focus{outline:none; border-color:var(--teal-lite)}
+
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px}
+  button.btn{
+    background:var(--teal-mid); color:#fff; border:none; border-radius:8px; padding:9px 16px;
+    font-size:.85rem; font-weight:600; cursor:pointer; transition:background .15s;
+  }
+  button.btn:hover{background:var(--teal-lite)}
+  button.btn.secondary{background:var(--surface2); color:var(--text); border:1px solid var(--border)}
+  button.btn.secondary:hover{border-color:var(--teal-lite)}
+  button.btn:disabled{opacity:.45; cursor:not-allowed}
+  select{background:var(--code-bg); color:var(--text); border:1px solid var(--border); border-radius:8px;
+         padding:9px 12px; font-size:.85rem}
+
+  /* Token chips */
+  .token-out{display:flex; flex-wrap:wrap; gap:6px; margin-top:16px; min-height:40px; align-items:center}
+  .tok{
+    display:inline-flex; align-items:center; padding:4px 9px; border-radius:6px; font-size:.82rem;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; border:1px solid transparent;
+    animation:pop .25s ease;
+  }
+  @keyframes pop{from{transform:scale(.7); opacity:0} to{transform:scale(1); opacity:1}}
+  .tok-count{font-size:.78rem; color:var(--text-dim); margin-top:10px}
+  .tok-count b{color:var(--teal-lite)}
+
+  .palette-0{background:rgba(0,105,92,.18); color:#26a69a; border-color:rgba(0,105,92,.35)}
+  .palette-1{background:rgba(21,101,192,.18); color:#5c9ce6; border-color:rgba(21,101,192,.35)}
+  .palette-2{background:rgba(198,40,40,.16); color:#ef5350; border-color:rgba(198,40,40,.32)}
+  .palette-3{background:rgba(255,179,0,.16); color:#ffb300; border-color:rgba(255,179,0,.32)}
+  .palette-4{background:rgba(106,27,154,.18); color:#ba68c8; border-color:rgba(106,27,154,.35)}
+
+  .note{font-size:.78rem; color:var(--text-muted); margin-top:14px; line-height:1.55}
+  .note code{background:var(--code-bg); padding:1px 5px; border-radius:4px}
+
+  /* Generation loop */
+  .gen-controls{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px}
+  .gen-text{
+    background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:16px 18px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.95rem; min-height:56px;
+    line-height:1.7;
+  }
+  .gen-text .cursor{display:inline-block; width:2px; height:1em; background:var(--teal-lite);
+                     vertical-align:text-bottom; animation:blink 1s step-start infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  .candidates{margin-top:18px}
+  .cand-row{display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:.82rem}
+  .cand-token{width:120px; flex-shrink:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+              color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .cand-bar-wrap{flex:1; background:var(--surface2); border-radius:5px; height:16px; overflow:hidden}
+  .cand-bar{height:100%; background:var(--border); border-radius:5px; transition:width .5s ease, background .3s}
+  .cand-bar.picked{background:linear-gradient(90deg, var(--teal), var(--teal-lite))}
+  .cand-pct{width:44px; text-align:right; color:var(--text-dim); flex-shrink:0}
+
+  .status-row{display:flex; gap:16px; flex-wrap:wrap; margin-top:16px; font-size:.8rem}
+  .status-chip{display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:99px;
+               background:var(--surface2); border:1px solid var(--border); color:var(--text-dim)}
+  .status-chip b{color:var(--text)}
+  .status-chip.end_turn{background:var(--green-bg); border-color:rgba(76,175,80,.35); color:var(--green)}
+  .status-chip.max_tokens{background:var(--amber-bg); border-color:rgba(255,179,0,.35); color:var(--amber)}
+
+  .callout{margin-top:20px; background:var(--surface2); border:1px solid var(--border);
+           border-radius:8px; padding:14px 16px; font-size:.8rem; color:var(--text-dim)}
+  .callout code{background:var(--code-bg); padding:1px 5px; border-radius:4px; color:var(--teal-lite)}
+
+  footer{max-width:980px; margin:0 auto; padding:0 24px 60px; font-size:.76rem; color:var(--text-muted)}
+  footer a{color:var(--teal-lite); text-decoration:none}
+
+  @media (max-width:640px){
+    .cand-token{width:80px}
+  }
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <div class="hdr-inner">
+    <div class="hdr-title">
+      <span class="badge">MODULE 1</span>
+      <div>
+        <h1>Tokenization &amp; Next-Token Generation</h1>
+        <p>Building with Claude — GenAI/LLM Primer</p>
+      </div>
+    </div>
+    <button id="theme-toggle" onclick="toggleTheme()">🌙 / ☀️</button>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <strong>Why this matters:</strong> Every Claude API call boils down to the same loop —
+    text is split into <strong>tokens</strong>, and the model predicts the next token
+    <strong>one at a time</strong> until it decides to stop. Pricing, context limits, and the
+    <code>stop_reason</code> field you check in every lab all come directly from this loop.
+    Play with both interactions below; nothing here calls a real API — it's a simplified,
+    offline model built to make the mechanics visible.
+  </div>
+
+  <!-- ══════════════ SECTION 1 — Tokenizer ══════════════ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">1</span><h2>Tokenizer playground</h2></div>
+    <p class="sec-sub">Type anything and watch it split into tokens — the same unit the Claude API
+      bills and limits you on. This is a simplified teaching tokenizer (word/punctuation splitting
+      with long-word subword breaks), not Claude's real tokenizer — but the intuition holds:
+      short common words ≈ 1 token, long or unusual words ≈ 2+ tokens.</p>
+
+    <div class="card">
+      <textarea id="tok-input" rows="3">The maximum debt-to-income ratio for a home loan is 40%.</textarea>
+      <div class="row">
+        <button class="btn" onclick="renderTokens()">Tokenize</button>
+        <button class="btn secondary" onclick="document.getElementById('tok-input').value=''; renderTokens();">Clear</button>
+      </div>
+      <div id="tok-output" class="token-out"></div>
+      <div class="tok-count" id="tok-count"></div>
+      <div class="note">Notice: <code>debt-to-income</code> and other long/hyphenated words split into
+        several chips, while short words like <code>is</code> or <code>a</code> stay whole.
+        This is why a document full of technical jargon or code often costs more tokens than
+        plain prose of the same character length.</div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SECTION 2 — Generation loop ══════════════ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">2</span><h2>Next-token generation loop</h2></div>
+    <p class="sec-sub">Pick a starting prompt (or write your own), then click <strong>Generate next
+      token</strong> to step through the loop one prediction at a time: candidate tokens are ranked
+      by probability, the model picks one, appends it, and checks whether to stop.</p>
+
+    <div class="card">
+      <div class="gen-controls">
+        <select id="preset-select" onchange="applyPreset()">
+          <option value="the capital of france is">"The capital of France is…"</option>
+          <option value="claude is an ai model built by">"Claude is an AI model built by…"</option>
+          <option value="the loan officer reviewed the">"The loan officer reviewed the…"</option>
+          <option value="__custom__">Custom prompt…</option>
+        </select>
+        <input type="text" id="custom-prompt" placeholder="type your own starter phrase…" style="display:none; max-width:280px">
+        <button class="btn secondary" onclick="resetGeneration()">Reset</button>
+      </div>
+
+      <div class="gen-text" id="gen-text"><span id="gen-fixed"></span><span class="cursor"></span></div>
+
+      <div class="candidates" id="candidates"></div>
+
+      <div class="row">
+        <button class="btn" id="step-btn" onclick="stepGeneration()">▶ Generate next token</button>
+        <button class="btn secondary" id="auto-btn" onclick="toggleAuto()">⏩ Auto-play</button>
+        <label style="font-size:.8rem; color:var(--text-dim); display:flex; align-items:center; gap:6px;">
+          max_tokens
+          <input type="text" id="max-tokens" value="18" style="width:50px; padding:5px 8px;">
+        </label>
+      </div>
+
+      <div class="status-row">
+        <div class="status-chip" id="chip-tokens">tokens generated: <b id="tok-generated">0</b></div>
+        <div class="status-chip" id="chip-stop">stop_reason: <b id="stop-reason">—</b></div>
+      </div>
+
+      <div class="callout">
+        This mirrors what happens inside <code>client.messages.create()</code>: generation
+        continues until the model reaches a natural stopping point
+        (<code>stop_reason: "end_turn"</code>) or you hit the <code>max_tokens</code> ceiling you
+        set on the request (<code>stop_reason: "max_tokens"</code>) — see
+        <a href="../../guides/module-01-api-setup-and-secure-integration.md">Module 1 guide, §4</a>.
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Part of <a href="../../guides/module-01-api-setup-and-secure-integration.md">Module 1 — API Setup
+  and Secure Integration</a> · Building with Claude
+</footer>
+
+<script>
+  // ── Theme ──────────────────────────────────────────────────────────────
+  function toggleTheme(){
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    root.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+  }
+
+  // ── Section 1: Tokenizer ──────────────────────────────────────────────
+  const PALETTES = ['palette-0','palette-1','palette-2','palette-3','palette-4'];
+
+  function splitIntoWordsAndPunct(text){
+    return text.match(/[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*|[^\sA-Za-z0-9]/g) || [];
+  }
+
+  // Simplified subword split for long tokens, purely illustrative.
+  function subwordSplit(word){
+    if (word.length <= 7) return [word];
+    const parts = [];
+    let i = 0;
+    while (i < word.length){
+      const chunk = word.slice(i, i + 5);
+      parts.push(i === 0 ? chunk : '▁' + chunk);
+      i += 5;
+    }
+    return parts;
+  }
+
+  function tokenize(text){
+    const words = splitIntoWordsAndPunct(text);
+    let tokens = [];
+    words.forEach(w => { tokens = tokens.concat(subwordSplit(w)); });
+    return tokens;
+  }
+
+  function renderTokens(){
+    const text = document.getElementById('tok-input').value;
+    const tokens = tokenize(text);
+    const out = document.getElementById('tok-output');
+    out.innerHTML = '';
+    tokens.forEach((t, i) => {
+      const span = document.createElement('span');
+      span.className = 'tok ' + PALETTES[i % PALETTES.length];
+      span.textContent = t;
+      out.appendChild(span);
+    });
+    document.getElementById('tok-count').innerHTML =
+      tokens.length ? `<b>${tokens.length}</b> tokens (≈ teaching estimate — Claude's real tokenizer may differ)` : '';
+  }
+
+  // ── Section 2: Toy bigram "generation" model ─────────────────────────
+  // A small built-in corpus purely for teaching the *shape* of next-token
+  // prediction — not a real language model.
+  const CORPUS = `
+    the capital of france is paris a beautiful historic city known for its museums and architecture .
+    claude is an ai model built by anthropic to be helpful honest and harmless .
+    claude is an ai assistant used by developers to build applications .
+    the loan officer reviewed the application and checked the credit score carefully .
+    the loan officer reviewed the documents and approved the request .
+    the loan officer reviewed the policy and cited the correct section .
+    a large language model predicts the next token one token at a time .
+    the model predicts the most likely next word based on patterns in its training data .
+    anthropic builds claude to help developers integrate ai into real applications .
+    paris is located in france and is home to the eiffel tower .
+    the credit score determines whether the loan application is approved or declined .
+  `.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  function buildBigrams(corpus){
+    const toks = corpus.match(/[a-z0-9]+|[.,]/g);
+    const map = {};
+    for (let i = 0; i < toks.length - 1; i++){
+      const a = toks[i], b = toks[i+1];
+      map[a] = map[a] || {};
+      map[a][b] = (map[a][b] || 0) + 1;
+    }
+    return map;
+  }
+  const BIGRAMS = buildBigrams(CORPUS);
+  const ALL_WORDS = Object.keys(BIGRAMS);
+
+  function candidatesFor(lastToken){
+    let table = BIGRAMS[lastToken];
+    if (!table){
+      // Fallback: sample a handful of common corpus words so the demo never dead-ends.
+      table = {};
+      ALL_WORDS.slice(0, 6).forEach((w, i) => table[w] = 6 - i);
+    }
+    const entries = Object.entries(table).sort((a,b) => b[1]-a[1]).slice(0, 5);
+    const total = entries.reduce((s,[,c]) => s + c, 0);
+    return entries.map(([tok,count]) => ({ token: tok, prob: count/total }));
+  }
+
+  let genTokens = [];   // generated words so far
+  let stopped = false;
+  let autoTimer = null;
+
+  function applyPreset(){
+    const val = document.getElementById('preset-select').value;
+    const customInput = document.getElementById('custom-prompt');
+    customInput.style.display = (val === '__custom__') ? 'inline-block' : 'none';
+    resetGeneration();
+  }
+
+  function currentPromptWords(){
+    const val = document.getElementById('preset-select').value;
+    const raw = (val === '__custom__')
+      ? document.getElementById('custom-prompt').value.toLowerCase()
+      : val;
+    return (raw.match(/[a-z0-9]+|[.,]/g) || []);
+  }
+
+  function resetGeneration(){
+    stopped = false;
+    clearInterval(autoTimer); autoTimer = null;
+    document.getElementById('auto-btn').textContent = '⏩ Auto-play';
+    genTokens = currentPromptWords();
+    document.getElementById('tok-generated').textContent = '0';
+    setStopChip('—');
+    document.getElementById('step-btn').disabled = false;
+    renderGenText();
+    renderCandidates(null);
+  }
+
+  function renderGenText(){
+    document.getElementById('gen-fixed').textContent = genTokens.join(' ').replace(/ ([.,])/g, '$1') + ' ';
+  }
+
+  function setStopChip(val){
+    const chip = document.getElementById('chip-stop');
+    const label = document.getElementById('stop-reason');
+    label.textContent = val;
+    chip.className = 'status-chip' + (val === 'end_turn' ? ' end_turn' : val === 'max_tokens' ? ' max_tokens' : '');
+  }
+
+  function renderCandidates(picked){
+    const box = document.getElementById('candidates');
+    if (!picked){ box.innerHTML = ''; return; }
+    box.innerHTML = '';
+    picked.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'cand-row';
+      const pct = Math.round(c.prob * 100);
+      row.innerHTML = `
+        <div class="cand-token">${c.token}</div>
+        <div class="cand-bar-wrap"><div class="cand-bar${c.isPicked ? ' picked' : ''}" style="width:${pct}%"></div></div>
+        <div class="cand-pct">${pct}%</div>`;
+      box.appendChild(row);
+    });
+  }
+
+  function stepGeneration(){
+    if (stopped) return;
+    const maxTok = parseInt(document.getElementById('max-tokens').value, 10) || 18;
+    const generatedSoFar = genTokens.length - currentPromptWords().length;
+
+    const last = genTokens[genTokens.length - 1];
+    const cands = candidatesFor(last);
+    cands[0].isPicked = true;
+    renderCandidates(cands);
+
+    setTimeout(() => {
+      const chosen = cands[0].token;
+      genTokens.push(chosen);
+      renderGenText();
+      const genCount = genTokens.length - currentPromptWords().length;
+      document.getElementById('tok-generated').textContent = String(Math.max(genCount,0)+1);
+
+      const newGenCount = generatedSoFar + 1;
+      if (chosen === '.' && newGenCount >= 4){
+        stopped = true;
+        setStopChip('end_turn');
+        finishGeneration();
+      } else if (newGenCount >= maxTok){
+        stopped = true;
+        setStopChip('max_tokens');
+        finishGeneration();
+      }
+    }, 450);
+  }
+
+  function finishGeneration(){
+    document.getElementById('step-btn').disabled = true;
+    clearInterval(autoTimer); autoTimer = null;
+    document.getElementById('auto-btn').textContent = '⏩ Auto-play';
+  }
+
+  function toggleAuto(){
+    const btn = document.getElementById('auto-btn');
+    if (autoTimer){
+      clearInterval(autoTimer); autoTimer = null;
+      btn.textContent = '⏩ Auto-play';
+      return;
+    }
+    btn.textContent = '⏸ Stop';
+    autoTimer = setInterval(() => { if (!stopped) stepGeneration(); else finishGeneration(); }, 900);
+  }
+
+  // init
+  renderTokens();
+  resetGeneration();
+</script>
+</body>
+</html>

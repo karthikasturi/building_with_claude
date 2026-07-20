@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Error Handling &amp; Cost Estimator | Building with Claude</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --teal:#00695c; --teal-mid:#00796b; --teal-lite:#26a69a; --teal-glow:rgba(0,105,92,.20);
+    --bg:#0e0e10; --surface:#18181c; --surface2:#202026; --border:#2a2a32;
+    --text:#e8e8ee; --text-dim:#8a8a9a; --text-muted:#55555f; --code-bg:#141418;
+    --green:#4caf50; --green-bg:rgba(76,175,80,.12);
+    --red:#ef5350; --red-bg:rgba(239,83,80,.12);
+    --amber:#ffb300; --amber-bg:rgba(255,179,0,.14);
+    --blue:#5c9ce6; --blue-bg:rgba(21,101,192,.14);
+    --purple:#ba68c8; --purple-bg:rgba(106,27,154,.14);
+    --m1:#1565c0;
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f3; --border:#dfe0e5;
+    --text:#1b1b1f; --text-dim:#5b5c66; --text-muted:#8a8b94; --code-bg:#eef0f2;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f3; --border:#dfe0e5;
+      --text:#1b1b1f; --text-dim:#5b5c66; --text-muted:#8a8b94; --code-bg:#eef0f2;
+    }
+  }
+
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+       background:var(--bg); color:var(--text); line-height:1.6; font-size:15px}
+
+  #hdr{position:sticky; top:0; z-index:100; background:color-mix(in srgb, var(--bg) 85%, transparent);
+       backdrop-filter:blur(14px); border-bottom:1px solid var(--border)}
+  .hdr-inner{max-width:980px; margin:0 auto; padding:14px 24px; display:flex; align-items:center;
+             justify-content:space-between; gap:16px; flex-wrap:wrap}
+  .hdr-title{display:flex; align-items:center; gap:10px}
+  .badge{background:var(--m1); color:#fff; font-size:.68rem; font-weight:700; padding:3px 9px;
+         border-radius:99px; letter-spacing:.03em}
+  .hdr-title h1{font-size:1.05rem; color:var(--teal-lite); font-weight:700}
+  .hdr-title p{font-size:.76rem; color:var(--text-dim); margin-top:1px}
+  #theme-toggle{background:var(--surface2); border:1px solid var(--border); color:var(--text);
+                border-radius:8px; padding:7px 12px; font-size:.78rem; cursor:pointer}
+  #theme-toggle:hover{border-color:var(--teal-lite)}
+
+  main{max-width:980px; margin:0 auto; padding:28px 24px 90px}
+  .intro{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--teal-mid);
+         border-radius:8px; padding:16px 20px; font-size:.88rem; color:var(--text-dim); margin-bottom:28px}
+  .intro strong{color:var(--text)}
+
+  section{margin-bottom:44px}
+  .sec-head{display:flex; align-items:baseline; gap:10px; margin-bottom:6px; flex-wrap:wrap}
+  .sec-head h2{font-size:1.15rem; color:var(--text)}
+  .sec-num{background:var(--teal); color:#fff; width:26px; height:26px; border-radius:50%;
+           display:inline-flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700; flex-shrink:0}
+  .sec-sub{font-size:.82rem; color:var(--text-dim); margin-bottom:18px}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px}
+
+  button.btn{background:var(--teal-mid); color:#fff; border:none; border-radius:8px; padding:9px 16px;
+             font-size:.85rem; font-weight:600; cursor:pointer; transition:background .15s}
+  button.btn:hover{background:var(--teal-lite)}
+  button.btn.secondary{background:var(--surface2); color:var(--text); border:1px solid var(--border)}
+  button.btn.secondary:hover{border-color:var(--teal-lite)}
+
+  pre.code{background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:14px 16px;
+           font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8rem; overflow-x:auto;
+           line-height:1.7}
+
+  /* ── Section 1: decision tree ────────────────────────────────────────── */
+  .scenario-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px}
+  .scn-btn{
+    background:var(--surface2); border:1px solid var(--border); color:var(--text-dim);
+    border-radius:8px; padding:9px 14px; font-size:.8rem; cursor:pointer; transition:all .15s;
+  }
+  .scn-btn:hover{border-color:var(--teal-lite)}
+  .scn-btn.on{background:var(--teal-glow); border-color:var(--teal-lite); color:var(--teal-lite); font-weight:600}
+
+  .tree{text-align:center; margin-bottom:18px}
+  .tree-root{
+    display:inline-block; background:var(--code-bg); border:1px solid var(--border); border-radius:8px;
+    padding:8px 16px; font-family:ui-monospace,monospace; font-size:.82rem; color:var(--text);
+  }
+  .tree-lines{height:22px; position:relative}
+  .tree-branches{display:flex; gap:8px; justify-content:center; flex-wrap:wrap}
+  .tree-leaf{
+    flex:1; min-width:120px; max-width:180px; padding:10px 8px; border-radius:8px;
+    background:var(--surface2); border:1px solid var(--border); font-size:.76rem; color:var(--text-dim);
+    transition:all .2s; opacity:.55;
+  }
+  .tree-leaf.active{opacity:1; transform:translateY(-3px)}
+  .tree-leaf.active.success{background:var(--green-bg); border-color:rgba(76,175,80,.5); color:var(--green)}
+  .tree-leaf.active.auth{background:var(--red-bg); border-color:rgba(239,83,80,.5); color:var(--red)}
+  .tree-leaf.active.rate{background:var(--amber-bg); border-color:rgba(255,179,0,.5); color:var(--amber)}
+  .tree-leaf.active.conn{background:var(--blue-bg); border-color:rgba(21,101,192,.5); color:var(--blue)}
+  .tree-leaf.active.status{background:var(--purple-bg); border-color:rgba(106,27,154,.5); color:var(--purple)}
+
+  .branch-line{display:block; padding:1px 0; opacity:.35; transition:opacity .2s, background .2s}
+  .branch-line.on{opacity:1; background:var(--teal-glow); border-radius:4px}
+
+  .tree-desc{background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+             padding:14px 16px; font-size:.83rem; color:var(--text-dim); margin-top:14px}
+  .tree-desc b{color:var(--text)}
+
+  /* ── Section 2: cost calculator ──────────────────────────────────────── */
+  .illustrative-flag{
+    display:inline-flex; align-items:center; gap:6px; background:var(--amber-bg);
+    border:1px solid rgba(255,179,0,.4); color:var(--amber); font-size:.74rem; font-weight:600;
+    padding:5px 12px; border-radius:99px; margin-bottom:16px;
+  }
+  textarea{
+    width:100%; background:var(--code-bg); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem;
+    padding:12px 14px; resize:vertical;
+  }
+  textarea:focus{outline:none; border-color:var(--teal-lite)}
+  .preset-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+
+  .slider-row{display:flex; align-items:center; gap:14px; margin-top:18px; font-size:.82rem; color:var(--text-dim)}
+  .slider-row input[type=range]{flex:1; accent-color:var(--teal-lite)}
+  .slider-row b{color:var(--text); min-width:90px; text-align:right}
+
+  .model-bars{margin-top:20px; display:flex; flex-direction:column; gap:12px}
+  .model-bar-row{display:flex; align-items:center; gap:12px}
+  .model-name{width:150px; flex-shrink:0; font-size:.82rem; color:var(--text)}
+  .model-name span{display:block; font-size:.7rem; color:var(--text-muted)}
+  .model-bar-wrap{flex:1; background:var(--surface2); border-radius:6px; height:26px; overflow:hidden; position:relative}
+  .model-bar{height:100%; border-radius:6px; transition:width .4s ease; display:flex; align-items:center;
+             justify-content:flex-end; padding-right:8px}
+  .model-bar.haiku{background:linear-gradient(90deg, #1565c0, #5c9ce6)}
+  .model-bar.sonnet{background:linear-gradient(90deg, var(--teal), var(--teal-lite))}
+  .model-bar.opus{background:linear-gradient(90deg, #6a1b9a, #ba68c8)}
+  .model-bar-cost{font-size:.75rem; font-weight:700; color:#fff}
+
+  .calc-summary{display:flex; gap:18px; flex-wrap:wrap; margin-top:16px; font-size:.78rem; color:var(--text-dim)}
+  .calc-summary b{color:var(--teal-lite)}
+
+  footer{max-width:980px; margin:0 auto; padding:0 24px 60px; font-size:.76rem; color:var(--text-muted)}
+  footer a{color:var(--teal-lite); text-decoration:none}
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <div class="hdr-inner">
+    <div class="hdr-title">
+      <span class="badge">MODULE 1</span>
+      <div>
+        <h1>Error Handling &amp; Cost Estimator</h1>
+        <p>Building with Claude — typed exceptions and token/cost awareness</p>
+      </div>
+    </div>
+    <button id="theme-toggle" onclick="toggleTheme()">🌙 / ☀️</button>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <strong>Why this matters:</strong> A production-quality Claude call catches specific,
+    typed exceptions instead of a bare <code>except Exception</code>, and estimates cost
+    <em>before</em> spending it. Both habits are graded explicitly in Lab 1 — this page lets you
+    trigger every exception branch safely, and see how input length and model choice move cost.
+  </div>
+
+  <!-- ══════════════ SECTION 1 — error decision tree ══════════════ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">1</span><h2>Error handling decision tree</h2></div>
+    <p class="sec-sub">Pick what happens when <code>client.messages.create(...)</code> runs, and
+      watch which <code>except</code> branch actually catches it.</p>
+
+    <div class="card">
+      <div class="scenario-row">
+        <button class="scn-btn on" data-k="success" onclick="pickScenario('success')">✅ Call succeeds</button>
+        <button class="scn-btn" data-k="auth" onclick="pickScenario('auth')">🔑 Invalid API key</button>
+        <button class="scn-btn" data-k="rate" onclick="pickScenario('rate')">⏳ Too many requests</button>
+        <button class="scn-btn" data-k="conn" onclick="pickScenario('conn')">🌐 Network unreachable</button>
+        <button class="scn-btn" data-k="status" onclick="pickScenario('status')">🛑 Server returns 500</button>
+      </div>
+
+      <div class="tree">
+        <div class="tree-root">try: response = client.messages.create(...)</div>
+        <div class="tree-lines"></div>
+        <div class="tree-branches" id="tree-branches">
+          <div class="tree-leaf" data-k="success">✅ Success<br><span>stop_reason: end_turn</span></div>
+          <div class="tree-leaf" data-k="auth">🔑 Authentication<wbr>Error</div>
+          <div class="tree-leaf" data-k="rate">⏳ RateLimit<wbr>Error</div>
+          <div class="tree-leaf" data-k="conn">🌐 APIConnection<wbr>Error</div>
+          <div class="tree-leaf" data-k="status">🛑 APIStatus<wbr>Error</div>
+        </div>
+      </div>
+
+      <pre class="code" id="tree-code"></pre>
+      <div class="tree-desc" id="tree-desc"></div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SECTION 2 — cost calculator ══════════════ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">2</span><h2>Token &amp; cost estimator</h2></div>
+    <p class="sec-sub">Estimate token count with the common "~4 characters per token" rule of
+      thumb, then compare illustrative cost across the three models used in this course.</p>
+
+    <div class="card">
+      <div class="illustrative-flag">⚠️ Illustrative example rates only — not real pricing. Check
+        <a href="https://platform.claude.com/docs" style="color:inherit" target="_blank" rel="noopener">platform.claude.com/docs</a> for current rates.</div>
+
+      <textarea id="cost-input" rows="4">What is the maximum debt-to-income ratio for a home loan, and which policy section defines it?</textarea>
+      <div class="preset-row">
+        <button class="btn secondary" onclick="setPreset('short')">Short question</button>
+        <button class="btn secondary" onclick="setPreset('long')">Long document paste</button>
+        <button class="btn secondary" onclick="setPreset('clear')">Clear</button>
+      </div>
+
+      <div class="slider-row">
+        expected output length
+        <input type="range" id="output-slider" min="20" max="2000" step="10" value="300" oninput="recalc()">
+        <b id="output-val">300 tokens</b>
+      </div>
+
+      <div class="model-bars" id="model-bars"></div>
+
+      <div class="calc-summary">
+        <span>Estimated input tokens: <b id="calc-input-tokens">0</b></span>
+        <span>Rule of thumb: <b>~4 characters ≈ 1 token</b> (English prose)</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Part of <a href="../../guides/module-01-api-setup-and-secure-integration.md">Module 1 — API Setup
+  and Secure Integration</a> · Building with Claude
+</footer>
+
+<script>
+  function toggleTheme(){
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    root.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+  }
+
+  // ── Section 1: decision tree ─────────────────────────────────────────
+  const SCENARIOS = {
+    success: {
+      desc: '<b>Happy path.</b> No exception raised. Check <code>response.stop_reason</code> — if it\'s "end_turn", the answer is complete and safe to use.',
+    },
+    auth: {
+      desc: '<b>Cause:</b> missing, malformed, or revoked API key. <b>Fix:</b> print a clear message pointing at <code>.env</code> and exit — retrying will not help; the key itself is invalid.',
+    },
+    rate: {
+      desc: '<b>Cause:</b> too many requests in too short a window. <b>Fix:</b> read the <code>retry-after</code> response header and back off before retrying — this one is safe (and expected) to retry.',
+    },
+    conn: {
+      desc: '<b>Cause:</b> DNS failure, no internet, firewall blocking the request — it never reached Anthropic\'s servers. <b>Fix:</b> check connectivity; safe to retry with backoff once restored.',
+    },
+    status: {
+      desc: '<b>Cause:</b> the API responded, but with an error status the SDK didn\'t map to a more specific class (e.g. a 500). <b>Fix:</b> log <code>e.status_code</code> and <code>e.message</code>; behaviour depends on the code.',
+    },
+  };
+
+  const CODE_LINES = [
+    { k: 'try',     text: 'try:' },
+    { k: 'try',     text: '    response = client.messages.create(model=MODEL, max_tokens=1024, messages=messages)' },
+    { k: 'success', text: '    # ── stop_reason == "end_turn" → use response normally' },
+    { k: 'auth',    text: 'except anthropic.AuthenticationError:' },
+    { k: 'auth',    text: '    print("Invalid API key — check .env"); raise SystemExit(1)' },
+    { k: 'rate',    text: 'except anthropic.RateLimitError as e:' },
+    { k: 'rate',    text: '    retry_after = e.response.headers.get("retry-after", "60")' },
+    { k: 'conn',    text: 'except anthropic.APIConnectionError:' },
+    { k: 'conn',    text: '    print("Cannot reach the API — check network"); raise SystemExit(1)' },
+    { k: 'status',  text: 'except anthropic.APIStatusError as e:' },
+    { k: 'status',  text: '    print(f"API {e.status_code}: {e.message}")' },
+  ];
+
+  function renderTreeCode(){
+    const pre = document.getElementById('tree-code');
+    pre.innerHTML = '';
+    CODE_LINES.forEach(line => {
+      const span = document.createElement('span');
+      span.className = 'branch-line';
+      span.dataset.k = line.k;
+      span.textContent = line.text;
+      pre.appendChild(span);
+      pre.appendChild(document.createTextNode('\n'));
+    });
+  }
+
+  function pickScenario(key){
+    document.querySelectorAll('.scn-btn').forEach(b => b.classList.toggle('on', b.dataset.k === key));
+    document.querySelectorAll('.tree-leaf').forEach(l => l.classList.toggle('active', l.dataset.k === key));
+    document.querySelectorAll('.tree-leaf').forEach(l => { if (l.dataset.k === key) l.classList.add(key); });
+    document.querySelectorAll('.branch-line').forEach(l => {
+      l.classList.toggle('on', l.dataset.k === key || (key !== 'success' && l.dataset.k === 'try'));
+    });
+    document.getElementById('tree-desc').innerHTML = SCENARIOS[key].desc;
+  }
+
+  renderTreeCode();
+  pickScenario('success');
+
+  // ── Section 2: cost calculator ───────────────────────────────────────
+  const PRESETS = {
+    short: 'What is the maximum debt-to-income ratio for a home loan?',
+    long: `Apex Bank Credit Policy Manual, Section 2 — Debt-to-Income Ratio Limits. The maximum DTI permitted for a home loan is 40% for salaried applicants, 35% for self-employed applicants, and 45% for government employees. DTI is calculated as (existing EMI + estimated new EMI) divided by gross monthly income. Loans exceeding these thresholds must be referred to the credit committee for manual review, and cannot be auto-approved regardless of credit score. Section 2.2 also notes that loans above INR 5,000,000 require credit committee review irrespective of DTI. Please summarize these rules for a new loan officer.`,
+    clear: '',
+  };
+
+  function setPreset(name){
+    document.getElementById('cost-input').value = PRESETS[name];
+    recalc();
+  }
+
+  // Illustrative example rates only — see the amber banner. Not real pricing.
+  const MODELS = [
+    { key: 'haiku',  name: 'claude-haiku-4-5',  sub: 'fast · cheapest',  cls: 'haiku',  inRate: 0.20, outRate: 1.00 },
+    { key: 'sonnet', name: 'claude-sonnet-4-6', sub: 'balanced',         cls: 'sonnet', inRate: 1.00, outRate: 5.00 },
+    { key: 'opus',   name: 'claude-opus-4-8',   sub: 'most capable',     cls: 'opus',   inRate: 4.00, outRate: 20.00 },
+  ];
+  // Rates are USD per 1,000,000 tokens — illustrative round numbers, NOT current pricing.
+
+  function estimateTokens(text){
+    return Math.max(1, Math.ceil(text.trim().length / 4));
+  }
+
+  function recalc(){
+    const text = document.getElementById('cost-input').value;
+    const inputTokens = text.trim() ? estimateTokens(text) : 0;
+    const outputTokens = parseInt(document.getElementById('output-slider').value, 10);
+    document.getElementById('output-val').textContent = `${outputTokens} tokens`;
+    document.getElementById('calc-input-tokens').textContent = inputTokens;
+
+    const costs = MODELS.map(m => ({
+      ...m,
+      cost: (inputTokens * m.inRate + outputTokens * m.outRate) / 1_000_000,
+    }));
+    const maxCost = Math.max(...costs.map(c => c.cost), 0.000001);
+
+    const wrap = document.getElementById('model-bars');
+    wrap.innerHTML = '';
+    costs.forEach(c => {
+      const pct = Math.max(4, Math.round((c.cost / maxCost) * 100));
+      const row = document.createElement('div');
+      row.className = 'model-bar-row';
+      row.innerHTML = `
+        <div class="model-name">${c.name}<span>${c.sub}</span></div>
+        <div class="model-bar-wrap">
+          <div class="model-bar ${c.cls}" style="width:${pct}%">
+            <span class="model-bar-cost">$${c.cost.toFixed(6)}</span>
+          </div>
+        </div>`;
+      wrap.appendChild(row);
+    });
+  }
+
+  document.getElementById('cost-input').addEventListener('input', recalc);
+  recalc();
+</script>
+</body>
+</html>
